@@ -1,0 +1,208 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import { Request } from 'express';
+
+import {
+  Roles,
+  RolesGuard,
+} from '../auth/roles.guard';
+
+import {
+  JwtPayload,
+} from '../auth/jwt.strategy';
+
+import {
+  AdminAttendanceService,
+} from './admin-attendance.service';
+
+/*
+ * ============================================================
+ * TYPES
+ * ============================================================
+ */
+
+type AuthenticatedRequest =
+  Request & {
+    user: JwtPayload;
+  };
+
+type AttendanceDecisionDto = {
+  reason?: string;
+};
+
+/*
+ * ============================================================
+ * TEACHER ATTENDANCE CONTROLLER
+ * ============================================================
+ *
+ * Base URL:
+ *
+ * /teacher/attendance
+ *
+ * TEACHER ONLY
+ *
+ * Teachers can:
+ *
+ * - View overall attendance
+ * - View attendance directory
+ * - Search/filter attendance
+ * - Filter by class/department
+ * - View individual student attendance
+ * - Manually approve attendance
+ * - Manually reject attendance
+ *
+ * The logged-in Teacher ID is saved as
+ * reviewedById when approving/rejecting.
+ * ============================================================
+ */
+
+@Controller('teacher/attendance')
+@UseGuards(RolesGuard)
+@Roles('TEACHER')
+export class TeacherAttendanceController {
+  constructor(
+    private readonly attendanceService:
+      AdminAttendanceService,
+  ) {}
+
+  /*
+   * ==========================================================
+   * OVERALL ATTENDANCE
+   * ==========================================================
+   *
+   * GET /teacher/attendance/overview
+   */
+
+  @Get('overview')
+  overview() {
+    return this.attendanceService.overview();
+  }
+
+  /*
+   * ==========================================================
+   * ATTENDANCE DIRECTORY
+   * ==========================================================
+   *
+   * GET /teacher/attendance
+   *
+   * Optional filters:
+   *
+   * ?classId=CSE
+   * ?search=Raj
+   */
+
+  @Get()
+  listAttendance(
+    @Query('classId')
+    classId?: string,
+
+    @Query('search')
+    search?: string,
+  ) {
+    return this.attendanceService.listAttendance(
+      classId,
+      search,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * ATTENDANCE BY CLASS / DEPARTMENT
+   * ==========================================================
+   *
+   * GET /teacher/attendance/class/:classId
+   */
+
+  @Get('class/:classId')
+  byClass(
+    @Param('classId')
+    classId: string,
+  ) {
+    return this.attendanceService.byClass(
+      classId,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * INDIVIDUAL STUDENT ATTENDANCE
+   * ==========================================================
+   *
+   * GET /teacher/attendance/student/:studentId
+   */
+
+  @Get('student/:studentId')
+  byStudent(
+    @Param('studentId')
+    studentId: string,
+  ) {
+    return this.attendanceService.byStudent(
+      studentId,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * APPROVE ATTENDANCE
+   * ==========================================================
+   *
+   * PATCH /teacher/attendance/:attendanceId/approve
+   *
+   * The logged-in Teacher becomes the reviewer.
+   */
+
+  @Patch(':attendanceId/approve')
+  approveAttendance(
+    @Req()
+    req: AuthenticatedRequest,
+
+    @Param('attendanceId')
+    attendanceId: string,
+
+    @Body()
+    dto: AttendanceDecisionDto,
+  ) {
+    return this.attendanceService.approveAttendance(
+      attendanceId,
+      req.user.sub,
+      dto.reason,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * REJECT ATTENDANCE
+   * ==========================================================
+   *
+   * PATCH /teacher/attendance/:attendanceId/reject
+   *
+   * The logged-in Teacher becomes the reviewer.
+   */
+
+  @Patch(':attendanceId/reject')
+  rejectAttendance(
+    @Req()
+    req: AuthenticatedRequest,
+
+    @Param('attendanceId')
+    attendanceId: string,
+
+    @Body()
+    dto: AttendanceDecisionDto,
+  ) {
+    return this.attendanceService.rejectAttendance(
+      attendanceId,
+      req.user.sub,
+      dto.reason,
+    );
+  }
+}

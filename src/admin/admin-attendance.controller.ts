@@ -1,0 +1,229 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+
+import { Request } from 'express';
+
+import {
+  Roles,
+  RolesGuard,
+} from '../auth/roles.guard';
+
+import {
+  JwtPayload,
+} from '../auth/jwt.strategy';
+
+import {
+  AdminAttendanceService,
+} from './admin-attendance.service';
+
+/*
+ * ============================================================
+ * TYPES
+ * ============================================================
+ */
+
+type AuthenticatedRequest =
+  Request & {
+    user: JwtPayload;
+  };
+
+type AttendanceDecisionDto = {
+  reason?: string;
+};
+
+/*
+ * ============================================================
+ * ADMIN ATTENDANCE CONTROLLER
+ * ============================================================
+ *
+ * Base URL:
+ *
+ * /admin/attendance
+ *
+ * ADMIN ONLY
+ *
+ * Features:
+ *
+ * - Overall attendance statistics
+ * - Full attendance directory
+ * - Filter by class/department
+ * - Search by student
+ * - Individual student attendance
+ * - Manual attendance approval
+ * - Manual attendance rejection
+ *
+ * Future:
+ *
+ * - 72-hour automatic attendance review
+ * - PC activity percentage
+ * - Warning count
+ * - Activity score
+ * ============================================================
+ */
+
+@Controller('admin/attendance')
+@UseGuards(RolesGuard)
+@Roles('ADMIN')
+export class AdminAttendanceController {
+  constructor(
+    private readonly attendanceService:
+      AdminAttendanceService,
+  ) {}
+
+  /*
+   * ==========================================================
+   * OVERALL ATTENDANCE
+   * ==========================================================
+   *
+   * GET /admin/attendance/overview
+   *
+   * Used for:
+   *
+   * - Overall pie chart
+   * - Present count
+   * - Absent count
+   * - Pending review count
+   */
+
+  @Get('overview')
+  overview() {
+    return this.attendanceService.overview();
+  }
+
+  /*
+   * ==========================================================
+   * ATTENDANCE DIRECTORY
+   * ==========================================================
+   *
+   * GET /admin/attendance
+   *
+   * Optional filters:
+   *
+   * ?classId=CSE
+   * ?search=RAJ
+   *
+   * Search can later match:
+   *
+   * - Student name
+   * - Username
+   * - Registration number
+   * - Class / Department
+   */
+
+  @Get()
+  listAttendance(
+    @Query('classId')
+    classId?: string,
+
+    @Query('search')
+    search?: string,
+  ) {
+    return this.attendanceService.listAttendance(
+      classId,
+      search,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * CLASS / DEPARTMENT ATTENDANCE
+   * ==========================================================
+   *
+   * GET /admin/attendance/class/:classId
+   */
+
+  @Get('class/:classId')
+  byClass(
+    @Param('classId')
+    classId: string,
+  ) {
+    return this.attendanceService.byClass(
+      classId,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * STUDENT ATTENDANCE DETAILS
+   * ==========================================================
+   *
+   * GET /admin/attendance/student/:studentId
+   *
+   * Returns the attendance history
+   * of one student.
+   */
+
+  @Get('student/:studentId')
+  byStudent(
+    @Param('studentId')
+    studentId: string,
+  ) {
+    return this.attendanceService.byStudent(
+      studentId,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * APPROVE ATTENDANCE
+   * ==========================================================
+   *
+   * PATCH /admin/attendance/:attendanceId/approve
+   *
+   * Admin manually approves an attendance record.
+   */
+
+  @Patch(':attendanceId/approve')
+  approveAttendance(
+    @Req()
+    req: AuthenticatedRequest,
+
+    @Param('attendanceId')
+    attendanceId: string,
+
+    @Body()
+    dto: AttendanceDecisionDto,
+  ) {
+    return this.attendanceService.approveAttendance(
+      attendanceId,
+      req.user.sub,
+      dto.reason,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * REJECT ATTENDANCE
+   * ==========================================================
+   *
+   * PATCH /admin/attendance/:attendanceId/reject
+   *
+   * Admin manually rejects an attendance record.
+   */
+
+  @Patch(':attendanceId/reject')
+  rejectAttendance(
+    @Req()
+    req: AuthenticatedRequest,
+
+    @Param('attendanceId')
+    attendanceId: string,
+
+    @Body()
+    dto: AttendanceDecisionDto,
+  ) {
+    return this.attendanceService.rejectAttendance(
+      attendanceId,
+      req.user.sub,
+      dto.reason,
+    );
+  }
+}
