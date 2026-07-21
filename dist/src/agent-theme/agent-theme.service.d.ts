@@ -4,8 +4,10 @@ export declare class AgentThemeService {
     constructor(prisma: PrismaService);
     getActiveTheme(): Promise<{
         id: string;
-        themeName: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        themeName: string;
         mainBubbleBgColor: string;
         secondaryPanelColor: string;
         borderColor: string;
@@ -28,13 +30,13 @@ export declare class AgentThemeService {
         sendReplyButtonLabel: string;
         defaultInformationalText: string;
         organizationLogoUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     updateActiveTheme(data: any): Promise<{
         id: string;
-        themeName: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        themeName: string;
         mainBubbleBgColor: string;
         secondaryPanelColor: string;
         borderColor: string;
@@ -57,7 +59,5 @@ export declare class AgentThemeService {
         sendReplyButtonLabel: string;
         defaultInformationalText: string;
         organizationLogoUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
 }

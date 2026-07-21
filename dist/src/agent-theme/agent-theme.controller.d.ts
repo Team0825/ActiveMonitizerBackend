@@ -4,8 +4,10 @@ export declare class AgentThemeController {
     constructor(agentThemeService: AgentThemeService);
     getActiveTheme(): Promise<{
         id: string;
-        themeName: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        themeName: string;
         mainBubbleBgColor: string;
         secondaryPanelColor: string;
         borderColor: string;
@@ -28,13 +30,13 @@ export declare class AgentThemeController {
         sendReplyButtonLabel: string;
         defaultInformationalText: string;
         organizationLogoUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     updateActiveTheme(updateData: any): Promise<{
         id: string;
-        themeName: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        themeName: string;
         mainBubbleBgColor: string;
         secondaryPanelColor: string;
         borderColor: string;
@@ -57,7 +59,5 @@ export declare class AgentThemeController {
         sendReplyButtonLabel: string;
         defaultInformationalText: string;
         organizationLogoUrl: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
 }
