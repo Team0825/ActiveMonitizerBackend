@@ -1103,14 +1103,7 @@ async getAttachmentDownloadUrl(
       );
     }
 
-    /*
-     * Determine reply recipient.
-     *
-     * If current user is original sender,
-     * reply goes to original direct recipient.
-     *
-     * Otherwise reply goes back to original sender.
-     */
+
 
     let recipientId:
       string | null =
