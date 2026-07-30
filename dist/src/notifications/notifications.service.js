@@ -13,10 +13,12 @@ exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const session_realtime_service_1 = require("../realtime/session-realtime.service");
+const notification_storage_service_1 = require("./notification-storage.service");
 let NotificationsService = class NotificationsService {
-    constructor(prisma, sessionRealtimeService) {
+    constructor(prisma, sessionRealtimeService, notificationStorageService) {
         this.prisma = prisma;
         this.sessionRealtimeService = sessionRealtimeService;
+        this.notificationStorageService = notificationStorageService;
     }
     async createMessage(currentUser, dto) {
         const sender = await this.prisma.user.findUnique({
@@ -416,6 +418,75 @@ let NotificationsService = class NotificationsService {
         }
         return message;
     }
+    async uploadAttachment(currentUser, messageId, file) {
+        const message = await this.prisma.message.findUnique({
+            where: {
+                id: messageId,
+            },
+            select: {
+                id: true,
+                senderId: true,
+            },
+        });
+        if (!message) {
+            throw new common_1.NotFoundException('Message not found');
+        }
+        if (message.senderId !==
+            currentUser.sub) {
+            throw new common_1.ForbiddenException('You do not have permission to add attachments to this message');
+        }
+        if (!file) {
+            throw new common_1.BadRequestException('Attachment file is required');
+        }
+        const uploaded = await this.notificationStorageService
+            .uploadAttachment(messageId, file);
+        try {
+            return await this.prisma
+                .messageAttachment
+                .create({
+                data: {
+                    messageId: messageId,
+                    fileName: uploaded.fileName,
+                    fileUrl: uploaded.fileUrl,
+                    mimeType: uploaded.mimeType,
+                    fileSize: uploaded.fileSize,
+                },
+            });
+        }
+        catch (error) {
+            try {
+                await this.notificationStorageService
+                    .deleteAttachment(uploaded.fileUrl);
+            }
+            catch {
+            }
+            throw error;
+        }
+    }
+    async getAttachmentDownloadUrl(currentUser, messageId, attachmentId) {
+        await this.getMessage(currentUser, messageId);
+        const attachment = await this.prisma
+            .messageAttachment
+            .findFirst({
+            where: {
+                id: attachmentId,
+                messageId: messageId,
+            },
+        });
+        if (!attachment) {
+            throw new common_1.NotFoundException('Attachment not found');
+        }
+        const downloadUrl = await this.notificationStorageService
+            .createSignedUrl(attachment.fileUrl);
+        return {
+            id: attachment.id,
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            fileSize: attachment.fileSize,
+            downloadUrl,
+            expiresIn: 300,
+        };
+    }
     async reply(currentUser, messageId, dto) {
         const parent = await this.prisma.message.findUnique({
             where: {
@@ -609,6 +680,7 @@ exports.NotificationsService = NotificationsService;
 exports.NotificationsService = NotificationsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        session_realtime_service_1.SessionRealtimeService])
+        session_realtime_service_1.SessionRealtimeService,
+        notification_storage_service_1.NotificationStorageService])
 ], NotificationsService);
 //# sourceMappingURL=notifications.service.js.map

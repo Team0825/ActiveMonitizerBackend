@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,8 +7,12 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { Request } from 'express';
 
@@ -274,8 +279,103 @@ export class NotificationsController {
    * This makes the routing intention clear and prevents
    * static paths from being confused with message IDs.
    */
+  /*
+ * ==========================================================
+ * UPLOAD MESSAGE ATTACHMENT
+ * ==========================================================
+ *
+ * POST /notifications/:id/attachments
+ *
+ * multipart/form-data
+ *
+ * Field name:
+ *
+ * file
+ *
+ * Maximum size:
+ *
+ * 10 MB
+ * ==========================================================
+ */
 
-  @Get(':id')
+@Post(':id/attachments')
+@Roles('ADMIN', 'TEACHER')
+@UseInterceptors(
+  FileInterceptor(
+    'file',
+    {
+      limits: {
+        fileSize:
+          10 * 1024 * 1024,
+      },
+    },
+  ),
+)
+uploadAttachment(
+  @Req()
+  req: AuthenticatedRequest,
+
+  @Param('id')
+  id: string,
+
+  @UploadedFile()
+  file?: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException(
+      'Attachment file is required',
+    );
+  }
+
+  return this.notificationsService
+    .uploadAttachment(
+      req.user,
+      id,
+      file,
+    );
+}
+
+/*
+ * ==========================================================
+ * DOWNLOAD MESSAGE ATTACHMENT
+ * ==========================================================
+ *
+ * GET
+ * /notifications/:messageId/attachments/:attachmentId/download
+ *
+ * Returns a temporary signed Supabase URL.
+ * ==========================================================
+ */
+
+@Get(
+  ':messageId/attachments/:attachmentId/download',
+)
+@Roles(
+  'ADMIN',
+  'TEACHER',
+  'STUDENT',
+)
+getAttachmentDownloadUrl(
+  @Req()
+  req: AuthenticatedRequest,
+
+  @Param('messageId')
+  messageId: string,
+
+  @Param('attachmentId')
+  attachmentId: string,
+) {
+  return this.notificationsService
+    .getAttachmentDownloadUrl(
+      req.user,
+      messageId,
+      attachmentId,
+    );
+}
+
+
+
+   @Get(':id')
    @Roles('ADMIN', 'TEACHER', 'STUDENT')
    getMessage(
     @Req()

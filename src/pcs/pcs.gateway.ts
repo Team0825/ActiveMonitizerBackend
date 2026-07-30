@@ -1153,6 +1153,10 @@ export class PcsGateway
         ? `pc:${targetHostname}`
         : `session:${internalSessionId}`;
 
+       this.logger.log(
+  `Sending ${payload.action} to room ${targetRoom}`,
+); 
+
     this.server
       .to(targetRoom)
       .emit(
@@ -1181,6 +1185,9 @@ export class PcsGateway
             ).toISOString(),
         },
       );
+      this.logger.log(
+  `Command emitted successfully. CommandId=${commandId}`,
+);
 
     client.emit(
       'command:sent',

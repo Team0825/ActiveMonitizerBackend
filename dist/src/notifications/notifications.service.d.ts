@@ -1,5 +1,6 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRealtimeService } from '../realtime/session-realtime.service';
+import { NotificationStorageService } from './notification-storage.service';
 import { CreateMessageDto, MessageFilterDto, ReplyMessageDto } from './dto/messages.dto';
 interface AuthUser {
     sub: string;
@@ -9,7 +10,8 @@ interface AuthUser {
 export declare class NotificationsService {
     private readonly prisma;
     private readonly sessionRealtimeService;
-    constructor(prisma: PrismaService, sessionRealtimeService: SessionRealtimeService);
+    private readonly notificationStorageService;
+    constructor(prisma: PrismaService, sessionRealtimeService: SessionRealtimeService, notificationStorageService: NotificationStorageService);
     createMessage(currentUser: AuthUser, dto: CreateMessageDto): Promise<{
         sender: {
             id: string;
@@ -31,8 +33,8 @@ export declare class NotificationsService {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -77,8 +79,8 @@ export declare class NotificationsService {
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
-                messageId: string;
                 fileSize: number | null;
+                messageId: string;
             }[];
         } & {
             id: string;
@@ -101,8 +103,8 @@ export declare class NotificationsService {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -156,8 +158,8 @@ export declare class NotificationsService {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -202,8 +204,8 @@ export declare class NotificationsService {
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
-                messageId: string;
                 fileSize: number | null;
+                messageId: string;
             }[];
         } & {
             id: string;
@@ -226,8 +228,8 @@ export declare class NotificationsService {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -243,6 +245,23 @@ export declare class NotificationsService {
         parentMessageId: string | null;
         sentAt: Date;
         senderId: string;
+    }>;
+    uploadAttachment(currentUser: AuthUser, messageId: string, file: Express.Multer.File): Promise<{
+        id: string;
+        createdAt: Date;
+        fileName: string;
+        fileUrl: string;
+        mimeType: string | null;
+        fileSize: number | null;
+        messageId: string;
+    }>;
+    getAttachmentDownloadUrl(currentUser: AuthUser, messageId: string, attachmentId: string): Promise<{
+        id: string;
+        fileName: string;
+        mimeType: string | null;
+        fileSize: number | null;
+        downloadUrl: string;
+        expiresIn: number;
     }>;
     reply(currentUser: AuthUser, messageId: string, dto: ReplyMessageDto): Promise<{
         sender: {

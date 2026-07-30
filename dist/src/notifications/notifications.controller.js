@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const roles_guard_1 = require("../auth/roles.guard");
 const messages_dto_1 = require("./dto/messages.dto");
 const notifications_service_1 = require("./notifications.service");
@@ -38,6 +39,17 @@ let NotificationsController = class NotificationsController {
     }
     reply(req, id, dto) {
         return this.notificationsService.reply(req.user, id, dto);
+    }
+    uploadAttachment(req, id, file) {
+        if (!file) {
+            throw new common_1.BadRequestException('Attachment file is required');
+        }
+        return this.notificationsService
+            .uploadAttachment(req.user, id, file);
+    }
+    getAttachmentDownloadUrl(req, messageId, attachmentId) {
+        return this.notificationsService
+            .getAttachmentDownloadUrl(req.user, messageId, attachmentId);
     }
     getMessage(req, id) {
         return this.notificationsService.getMessage(req.user, id);
@@ -95,6 +107,31 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, messages_dto_1.ReplyMessageDto]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "reply", null);
+__decorate([
+    (0, common_1.Post)(':id/attachments'),
+    (0, roles_guard_1.Roles)('ADMIN', 'TEACHER'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        limits: {
+            fileSize: 10 * 1024 * 1024,
+        },
+    })),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, Object]),
+    __metadata("design:returntype", void 0)
+], NotificationsController.prototype, "uploadAttachment", null);
+__decorate([
+    (0, common_1.Get)(':messageId/attachments/:attachmentId/download'),
+    (0, roles_guard_1.Roles)('ADMIN', 'TEACHER', 'STUDENT'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('messageId')),
+    __param(2, (0, common_1.Param)('attachmentId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:returntype", void 0)
+], NotificationsController.prototype, "getAttachmentDownloadUrl", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, roles_guard_1.Roles)('ADMIN', 'TEACHER', 'STUDENT'),

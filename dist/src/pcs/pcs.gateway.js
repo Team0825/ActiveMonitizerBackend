@@ -422,6 +422,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             'ALL'
             ? `pc:${targetHostname}`
             : `session:${internalSessionId}`;
+        this.logger.log(`Sending ${payload.action} to room ${targetRoom}`);
         this.server
             .to(targetRoom)
             .emit('command:execute', {
@@ -433,6 +434,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             issuedBy: user.sub,
             issuedAt: new Date(issuedAt).toISOString(),
         });
+        this.logger.log(`Command emitted successfully. CommandId=${commandId}`);
         client.emit('command:sent', {
             commandId,
             targetHostname,

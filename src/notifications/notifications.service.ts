@@ -7,6 +7,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRealtimeService } from '../realtime/session-realtime.service';
+import { NotificationStorageService } from './notification-storage.service';
 
 import {
   CreateMessageDto,
@@ -39,6 +40,9 @@ export class NotificationsService {
 
   private readonly sessionRealtimeService:
     SessionRealtimeService,
+
+  private readonly notificationStorageService:
+    NotificationStorageService,
 ) {}
 
   /*
@@ -821,6 +825,211 @@ return createdMessage;
 
     return message;
   }
+  /*
+ * ==========================================================
+ * UPLOAD MESSAGE ATTACHMENT
+ * ==========================================================
+ *
+ * The message must already exist.
+ *
+ * For now, only the original sender can add attachments
+ * to the message.
+ *
+ * Flow:
+ *
+ * 1. Verify message exists.
+ * 2. Verify current user is original sender.
+ * 3. Upload file to private Supabase Storage.
+ * 4. Save attachment metadata in Prisma.
+ * 5. Return attachment metadata.
+ * ==========================================================
+ */
+
+async uploadAttachment(
+  currentUser: AuthUser,
+  messageId: string,
+  file: Express.Multer.File,
+) {
+  const message =
+    await this.prisma.message.findUnique({
+      where: {
+        id: messageId,
+      },
+
+      select: {
+        id: true,
+        senderId: true,
+      },
+    });
+
+  if (!message) {
+    throw new NotFoundException(
+      'Message not found',
+    );
+  }
+
+  /*
+   * Only the original sender can upload
+   * an attachment to an existing message.
+   *
+   * This prevents recipients from modifying
+   * another user's original message.
+   */
+
+  if (
+    message.senderId !==
+    currentUser.sub
+  ) {
+    throw new ForbiddenException(
+      'You do not have permission to add attachments to this message',
+    );
+  }
+
+  if (!file) {
+    throw new BadRequestException(
+      'Attachment file is required',
+    );
+  }
+
+  /*
+   * Upload file to private
+   * Supabase Storage.
+   */
+
+  const uploaded =
+    await this.notificationStorageService
+      .uploadAttachment(
+        messageId,
+        file,
+      );
+
+  try {
+    /*
+     * Store attachment metadata
+     * in PostgreSQL through Prisma.
+     */
+
+    return await this.prisma
+      .messageAttachment
+      .create({
+        data: {
+          messageId:
+            messageId,
+
+          fileName:
+            uploaded.fileName,
+
+          fileUrl:
+            uploaded.fileUrl,
+
+          mimeType:
+            uploaded.mimeType,
+
+          fileSize:
+            uploaded.fileSize,
+        },
+      });
+  } catch (error) {
+    /*
+     * Database creation failed after
+     * Supabase upload.
+     *
+     * Remove the uploaded file so we
+     * do not leave orphaned files.
+     */
+
+    try {
+      await this.notificationStorageService
+        .deleteAttachment(
+          uploaded.fileUrl,
+        );
+    } catch {
+      /*
+       * Do not replace the original
+       * database error if cleanup fails.
+       */
+    }
+
+    throw error;
+  }
+}
+
+/*
+ * ==========================================================
+ * GET ATTACHMENT DOWNLOAD URL
+ * ==========================================================
+ *
+ * Files are stored privately.
+ *
+ * An authorized user requests an attachment.
+ * We verify that the user can view the parent message,
+ * then generate a temporary Supabase signed URL.
+ * ==========================================================
+ */
+
+async getAttachmentDownloadUrl(
+  currentUser: AuthUser,
+  messageId: string,
+  attachmentId: string,
+) {
+  /*
+   * Reuse the existing message authorization.
+   *
+   * getMessage() throws automatically if:
+   *
+   * - Message does not exist.
+   * - User cannot view the message.
+   */
+
+  await this.getMessage(
+    currentUser,
+    messageId,
+  );
+
+  const attachment =
+    await this.prisma
+      .messageAttachment
+      .findFirst({
+        where: {
+          id:
+            attachmentId,
+
+          messageId:
+            messageId,
+        },
+      });
+
+  if (!attachment) {
+    throw new NotFoundException(
+      'Attachment not found',
+    );
+  }
+
+  const downloadUrl =
+    await this.notificationStorageService
+      .createSignedUrl(
+        attachment.fileUrl,
+      );
+
+  return {
+    id:
+      attachment.id,
+
+    fileName:
+      attachment.fileName,
+
+    mimeType:
+      attachment.mimeType,
+
+    fileSize:
+      attachment.fileSize,
+
+    downloadUrl,
+
+    expiresIn:
+      300,
+  };
+}
 
   /*
    * ==========================================================

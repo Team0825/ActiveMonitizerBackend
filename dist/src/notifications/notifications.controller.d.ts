@@ -47,8 +47,8 @@ export declare class NotificationsController {
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
-                messageId: string;
                 fileSize: number | null;
+                messageId: string;
             }[];
         } & {
             id: string;
@@ -71,8 +71,8 @@ export declare class NotificationsController {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -126,8 +126,8 @@ export declare class NotificationsController {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -165,8 +165,8 @@ export declare class NotificationsController {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
@@ -211,6 +211,23 @@ export declare class NotificationsController {
         sentAt: Date;
         senderId: string;
     }>;
+    uploadAttachment(req: AuthenticatedRequest, id: string, file?: Express.Multer.File): Promise<{
+        id: string;
+        createdAt: Date;
+        fileName: string;
+        fileUrl: string;
+        mimeType: string | null;
+        fileSize: number | null;
+        messageId: string;
+    }>;
+    getAttachmentDownloadUrl(req: AuthenticatedRequest, messageId: string, attachmentId: string): Promise<{
+        id: string;
+        fileName: string;
+        mimeType: string | null;
+        fileSize: number | null;
+        downloadUrl: string;
+        expiresIn: number;
+    }>;
     getMessage(req: AuthenticatedRequest, id: string): Promise<{
         sender: {
             id: string;
@@ -239,8 +256,8 @@ export declare class NotificationsController {
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
-                messageId: string;
                 fileSize: number | null;
+                messageId: string;
             }[];
         } & {
             id: string;
@@ -263,8 +280,8 @@ export declare class NotificationsController {
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
-            messageId: string;
             fileSize: number | null;
+            messageId: string;
         }[];
     } & {
         id: string;
