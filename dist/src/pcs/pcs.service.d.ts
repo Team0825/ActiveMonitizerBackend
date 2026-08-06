@@ -1,5 +1,6 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { PcCommandAction } from './dto/pcs.dto';
+import { PcSystemInfoPayload } from "./dto/system-info.dto";
 export declare class PcsService {
     private readonly prisma;
     constructor(prisma: PrismaService);
@@ -13,6 +14,7 @@ export declare class PcsService {
         healthStatus: string;
         internetStatus: string;
         latencyMs: number | null;
+        osArchitecture: string | null;
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
@@ -40,6 +42,7 @@ export declare class PcsService {
         healthStatus: string;
         internetStatus: string;
         latencyMs: number | null;
+        osArchitecture: string | null;
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
@@ -67,6 +70,7 @@ export declare class PcsService {
         healthStatus: string;
         internetStatus: string;
         latencyMs: number | null;
+        osArchitecture: string | null;
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
@@ -94,6 +98,7 @@ export declare class PcsService {
         healthStatus: string;
         internetStatus: string;
         latencyMs: number | null;
+        osArchitecture: string | null;
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
@@ -121,6 +126,7 @@ export declare class PcsService {
         healthStatus: string;
         internetStatus: string;
         latencyMs: number | null;
+        osArchitecture: string | null;
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
@@ -141,6 +147,7 @@ export declare class PcsService {
     logCommand(actorId: string, action: PcCommandAction, targetPc: string, metadata?: Record<string, unknown>): Promise<{
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         actorId: string;
         action: string;
         targetPc: string | null;
@@ -159,4 +166,42 @@ export declare class PcsService {
         activityPercentage: number;
         updatedAt: string;
     }>;
+    updateSystemInfo(hostname: string, info: PcSystemInfoPayload): Promise<{
+        id: string;
+        updatedAt: Date;
+        status: string;
+        hostname: string;
+        displayName: string | null;
+        labName: string | null;
+        healthStatus: string;
+        internetStatus: string;
+        latencyMs: number | null;
+        osArchitecture: string | null;
+        osName: string | null;
+        osVersion: string | null;
+        cpuName: string | null;
+        totalMemoryMb: number | null;
+        availableMemoryMb: number | null;
+        totalDiskMb: number | null;
+        availableDiskMb: number | null;
+        agentVersion: string | null;
+        clientVersion: string | null;
+        updateStatus: string;
+        currentSessionId: string | null;
+        currentStudentId: string | null;
+        lastSeen: Date | null;
+        lastHealthCheck: Date | null;
+        lastSyncAt: Date | null;
+        registeredAt: Date;
+    }>;
+    getHealth(): Promise<{
+        hostname: string;
+        status: string;
+        labName: string | null;
+        lastSeen: Date | null;
+        sessionId: string | null;
+        studentId: string | null;
+        online: boolean;
+        heartbeatAgeSeconds: number;
+    }[]>;
 }

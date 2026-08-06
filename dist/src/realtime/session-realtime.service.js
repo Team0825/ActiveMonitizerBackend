@@ -14,36 +14,88 @@ let SessionRealtimeService = SessionRealtimeService_1 = class SessionRealtimeSer
         this.logger = new common_1.Logger(SessionRealtimeService_1.name);
     }
     setServer(server) {
-        this.server =
-            server;
+        this.server = server;
         this.logger.log('Realtime Socket.IO server registered.');
+    }
+    getServer() {
+        return this.server;
     }
     emitSessionEnded(sessionId, payload) {
         if (!this.server) {
-            this.logger.warn(`Unable to emit session:ended for ${sessionId}: Socket.IO server is not ready.`);
+            this.logger.warn(`Unable to emit session:ended for ${sessionId}.`);
             return;
         }
         const room = `session:${sessionId}`;
         this.server
             .to(room)
             .emit('session:ended', payload);
-        this.logger.log(`session:ended emitted to ${room}. Reason: ${payload.reason}`);
+        this.logger.log(`session:ended -> ${room}`);
+    }
+    emitPolicyUpdated(sessionId, policy) {
+        if (!this.server) {
+            this.logger.warn(`Unable to emit policy:update for ${sessionId}.`);
+            return;
+        }
+        const room = `session:${sessionId}`;
+        this.server
+            .to(room)
+            .emit('policy:update', policy);
+        this.logger.log(`policy:update -> ${room}`);
+    }
+    emitPolicyAcknowledged(sessionId, hostname, payload) {
+        if (!this.server) {
+            return;
+        }
+        this.server
+            .to(`session:${sessionId}`)
+            .emit('policy:ack', {
+            hostname,
+            ...(payload ??
+                {}),
+        });
+    }
+    emitScreenshotReady(sessionId, payload) {
+        if (!this.server) {
+            return;
+        }
+        this.server
+            .to(`session:${sessionId}`)
+            .emit('screenshot:ready', payload);
+    }
+    emitRemoteCommand(hostname, payload) {
+        if (!this.server) {
+            return;
+        }
+        this.server
+            .to(`pc:${hostname}`)
+            .emit('remote:command', payload);
+    }
+    emitAnnouncement(sessionId, payload) {
+        if (!this.server) {
+            return;
+        }
+        this.server
+            .to(`session:${sessionId}`)
+            .emit('announcement', payload);
+    }
+    emitToSession(sessionId, eventName, payload) {
+        if (!this.server) {
+            return;
+        }
+        this.server
+            .to(`session:${sessionId}`)
+            .emit(eventName, payload);
     }
     emitToPc(hostname, eventName, payload) {
         if (!this.server) {
-            this.logger.warn(`Unable to emit ${eventName} to PC ${hostname}: Socket.IO server is not ready.`);
+            this.logger.warn(`Unable to emit ${eventName} to ${hostname}.`);
             return;
         }
-        const normalizedHostname = hostname.trim();
-        if (!normalizedHostname) {
-            this.logger.warn(`Unable to emit ${eventName}: PC hostname is empty.`);
-            return;
-        }
-        const room = `pc:${normalizedHostname}`;
+        const room = `pc:${hostname.trim()}`;
         this.server
             .to(room)
             .emit(eventName, payload);
-        this.logger.log(`${eventName} emitted to ${room}.`);
+        this.logger.log(`${eventName} -> ${room}`);
     }
 };
 exports.SessionRealtimeService = SessionRealtimeService;

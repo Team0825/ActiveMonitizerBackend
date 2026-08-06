@@ -44,6 +44,7 @@ export declare class NotificationsController {
             attachments: {
                 id: string;
                 createdAt: Date;
+                updatedAt: Date;
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
@@ -68,6 +69,7 @@ export declare class NotificationsController {
         attachments: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
@@ -123,6 +125,7 @@ export declare class NotificationsController {
         attachments: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
@@ -162,6 +165,7 @@ export declare class NotificationsController {
         attachments: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             fileName: string;
             fileUrl: string;
             mimeType: string | null;
@@ -214,6 +218,7 @@ export declare class NotificationsController {
     uploadAttachment(req: AuthenticatedRequest, id: string, file?: Express.Multer.File): Promise<{
         id: string;
         createdAt: Date;
+        updatedAt: Date;
         fileName: string;
         fileUrl: string;
         mimeType: string | null;
@@ -253,6 +258,7 @@ export declare class NotificationsController {
             attachments: {
                 id: string;
                 createdAt: Date;
+                updatedAt: Date;
                 fileName: string;
                 fileUrl: string;
                 mimeType: string | null;
@@ -277,6 +283,7 @@ export declare class NotificationsController {
         attachments: {
             id: string;
             createdAt: Date;
+            updatedAt: Date;
             fileName: string;
             fileUrl: string;
             mimeType: string | null;

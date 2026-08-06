@@ -1,0 +1,16 @@
+-- AlterTable
+ALTER TABLE "PcHealthReport" ADD COLUMN     "agentVersion" TEXT,
+ADD COLUMN     "diskUsage" DOUBLE PRECISION,
+ADD COLUMN     "dotNetVersion" TEXT,
+ADD COLUMN     "freeDiskGb" INTEGER,
+ADD COLUMN     "freeMemoryMb" INTEGER,
+ADD COLUMN     "internetConnected" BOOLEAN,
+ADD COLUMN     "lastSystemReport" TIMESTAMP(3),
+ADD COLUMN     "osArchitecture" TEXT,
+ADD COLUMN     "osName" TEXT,
+ADD COLUMN     "osVersion" TEXT,
+ADD COLUMN     "processArchitecture" TEXT,
+ADD COLUMN     "processorCount" INTEGER,
+ADD COLUMN     "ramUsage" DOUBLE PRECISION,
+ADD COLUMN     "totalDiskGb" INTEGER,
+ADD COLUMN     "totalMemoryMb" INTEGER;

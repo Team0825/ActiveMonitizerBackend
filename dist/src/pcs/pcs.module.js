@@ -12,11 +12,13 @@ const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const pcs_gateway_1 = require("./pcs.gateway");
 const pcs_service_1 = require("./pcs.service");
+const pcs_controller_1 = require("./pcs.controller");
 let PcsModule = class PcsModule {
 };
 exports.PcsModule = PcsModule;
 exports.PcsModule = PcsModule = __decorate([
     (0, common_1.Module)({
+        controllers: [pcs_controller_1.PcsController],
         imports: [
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],

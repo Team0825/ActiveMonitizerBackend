@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,6 +26,8 @@ import {
   JoinSessionDto,
   RequestSpecialAccessDto,
 } from './dto/session.dto';
+
+import { UpdateSessionPolicyDto } from './dto/session-policy.dto';
 
 /*
  * ============================================================
@@ -347,4 +350,63 @@ export class SessionsController {
         id,
       );
   }
+
+  /*
+   * ==========================================================
+   * GET SESSION POLICY
+   * ==========================================================
+   *
+   * GET:
+   *
+   * /sessions/:id/policy
+   *
+   * Returns the complete security policy
+   * for the session.
+   */
+
+  @Get(':id/policy')
+  @Roles(
+    'TEACHER',
+    'ADMIN',
+  )
+  getSessionPolicy(
+    @Param('id')
+    id: string,
+  ) {
+    return this.sessionsService.getSessionPolicy(
+      id,
+    );
+  }
+
+  /*
+   * ==========================================================
+   * UPDATE SESSION POLICY
+   * ==========================================================
+   *
+   * PUT:
+   *
+   * /sessions/:id/policy
+   *
+   * Updates the security policy
+   * for the session.
+   */
+
+  @Put(':id/policy')
+  @Roles(
+    'TEACHER',
+    'ADMIN',
+  )
+  updateSessionPolicy(
+    @Param('id')
+    id: string,
+
+    @Body()
+    dto: UpdateSessionPolicyDto,
+  ) {
+    return this.sessionsService.updateSessionPolicy(
+      id,
+      dto,
+    );
+  }
+
 }

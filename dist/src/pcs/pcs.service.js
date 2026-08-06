@@ -241,6 +241,43 @@ let PcsService = class PcsService {
             updatedAt: now.toISOString(),
         };
     }
+    async updateSystemInfo(hostname, info) {
+        return this.prisma.pc.update({
+            where: {
+                hostname
+            },
+            data: {
+                agentVersion: info.agentVersion,
+                osName: info.osName,
+                osVersion: info.osVersion,
+                osArchitecture: info.osArchitecture,
+                totalMemoryMb: info.totalMemoryMb,
+                availableMemoryMb: info.freeMemoryMb,
+                totalDiskMb: info.totalDiskGb * 1024,
+                availableDiskMb: info.freeDiskGb * 1024,
+                lastSyncAt: new Date()
+            }
+        });
+    }
+    async getHealth() {
+        const pcs = await this.prisma.pc.findMany({
+            orderBy: {
+                hostname: 'asc',
+            },
+        });
+        return pcs.map(pc => ({
+            hostname: pc.hostname,
+            status: pc.status,
+            labName: pc.labName,
+            lastSeen: pc.lastSeen,
+            sessionId: pc.currentSessionId,
+            studentId: pc.currentStudentId,
+            online: pc.status === 'ONLINE',
+            heartbeatAgeSeconds: pc.lastSeen
+                ? Math.floor((Date.now() - new Date(pc.lastSeen).getTime()) / 1000)
+                : -1,
+        }));
+    }
 };
 exports.PcsService = PcsService;
 exports.PcsService = PcsService = __decorate([

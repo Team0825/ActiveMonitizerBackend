@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const roles_guard_1 = require("../auth/roles.guard");
 const sessions_service_1 = require("./sessions.service");
 const session_dto_1 = require("./dto/session.dto");
+const session_policy_dto_1 = require("./dto/session-policy.dto");
 let StudentSessionController = class StudentSessionController {
     constructor(sessionsService) {
         this.sessionsService = sessionsService;
@@ -69,6 +70,12 @@ let SessionsController = class SessionsController {
     end(req, id) {
         return this.sessionsService
             .endSession(req.user.sub, req.user.role, id);
+    }
+    getSessionPolicy(id) {
+        return this.sessionsService.getSessionPolicy(id);
+    }
+    updateSessionPolicy(id, dto) {
+        return this.sessionsService.updateSessionPolicy(id, dto);
     }
 };
 exports.SessionsController = SessionsController;
@@ -133,6 +140,23 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], SessionsController.prototype, "end", null);
+__decorate([
+    (0, common_1.Get)(':id/policy'),
+    (0, roles_guard_1.Roles)('TEACHER', 'ADMIN'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], SessionsController.prototype, "getSessionPolicy", null);
+__decorate([
+    (0, common_1.Put)(':id/policy'),
+    (0, roles_guard_1.Roles)('TEACHER', 'ADMIN'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, session_policy_dto_1.UpdateSessionPolicyDto]),
+    __metadata("design:returntype", void 0)
+], SessionsController.prototype, "updateSessionPolicy", null);
 exports.SessionsController = SessionsController = __decorate([
     (0, common_1.Controller)('sessions'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),

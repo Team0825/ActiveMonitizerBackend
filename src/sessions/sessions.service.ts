@@ -27,6 +27,7 @@ import {
   JoinSessionDto,
   RequestSpecialAccessDto,
 } from './dto/session.dto';
+import { UpdateSessionPolicyDto } from './dto/session-policy.dto';
 
 @Injectable()
 export class SessionsService {
@@ -124,84 +125,207 @@ export class SessionsService {
    */
 
   async createSession(
-    teacherId: string,
-    dto: CreateSessionDto,
-  ) {
-    const createdAt =
-      new Date();
+  teacherId: string,
+  dto: CreateSessionDto,
+) {
+  const createdAt = new Date();
 
-    const endsAt =
-      new Date(
-        createdAt.getTime() +
-          dto.durationMinutes *
-            60_000,
-      );
+  const endsAt = new Date(
+    createdAt.getTime() +
+      dto.durationMinutes * 60_000,
+  );
 
-    const sessionCode =
-      await this
-        .generateUniqueSessionCode();
+  const sessionCode =
+    await this.generateUniqueSessionCode();
 
-    const created =
-      await this.prisma
-        .classSession
-        .create({
-          data: {
-            sessionCode,
+  const created =
+    await this.prisma.$transaction(
+      async (tx) => {
+        const session =
+          await tx.classSession.create({
+            data: {
+              sessionCode,
 
-            classTitle:
-              dto.classTitle,
+              classTitle: dto.classTitle,
 
-            teacherId,
+              teacherId,
 
-            durationMinutes:
-              dto.durationMinutes,
+              durationMinutes:
+                dto.durationMinutes,
 
-            joinWindowMinutes:
-              dto.joinWindowMinutes ??
-              15,
+              joinWindowMinutes:
+                dto.joinWindowMinutes ??
+                15,
 
-            allowedSites:
-              JSON.stringify(
-                dto.allowedSites ??
-                  [],
+              /* -------------------------
+               * Security Policy
+               * ------------------------- */
+
+              allowInternet:
+                dto.allowInternet ??
+                true,
+
+              allowClipboard:
+                dto.allowClipboard ??
+                true,
+
+              allowUsb:
+                dto.allowUsb ??
+                true,
+
+              allowTaskManager:
+                dto.allowTaskManager ??
+                true,
+
+              allowAltTab:
+                dto.allowAltTab ??
+                true,
+
+              allowWindowsKey:
+                dto.allowWindowsKey ??
+                true,
+
+              allowPrintScreen:
+                dto.allowPrintScreen ??
+                true,
+
+              freezeOnEnd:
+                dto.freezeOnEnd ??
+                false,
+
+              allowOffline:
+                dto.allowOffline ??
+                true,
+
+              restrictExistingFiles:
+                dto.restrictExistingFiles ??
+                false,
+
+              restrictUnauthorizedApps:
+                dto.restrictUnauthorizedApps ??
+                false,
+
+              screenshotInterval:
+                dto.screenshotInterval,
+
+              warningMinutes:
+                dto.warningMinutes ??
+                5,
+
+              instructions:
+                dto.instructions,
+
+              sessionMode:
+                dto.sessionMode ??
+                'LAB',
+
+              questionMode:
+                dto.questionMode ??
+                'COMMON',
+
+              createdAt,
+
+              endsAt,
+            },
+          });
+
+        /* -------------------------
+         * Allowed Websites
+         * ------------------------- */
+
+        if (
+          dto.allowedWebsites?.length
+        ) {
+          await tx.allowedWebsite.createMany({
+            data:
+              dto.allowedWebsites.map(
+                (domain) => ({
+                  sessionId:
+                    session.id,
+                  domain,
+                }),
               ),
+          });
+        }
 
-            blockedSites:
-              JSON.stringify(
-                dto.blockedSites ??
-                  [],
+        /* -------------------------
+         * Blocked Websites
+         * ------------------------- */
+
+        if (
+          dto.blockedWebsites?.length
+        ) {
+          await tx.blockedWebsite.createMany({
+            data:
+              dto.blockedWebsites.map(
+                (domain) => ({
+                  sessionId:
+                    session.id,
+                  domain,
+                }),
               ),
+          });
+        }
 
-            createdAt,
+        /* -------------------------
+         * Allowed Applications
+         * ------------------------- */
 
-            endsAt,
+        if (
+          dto.allowedApplications?.length
+        ) {
+          await tx.allowedApplication.createMany({
+            data:
+              dto.allowedApplications.map(
+                (processName) => ({
+                  sessionId:
+                    session.id,
+                  processName,
+                }),
+              ),
+          });
+        }
+
+        /* -------------------------
+         * Blocked Applications
+         * ------------------------- */
+
+        if (
+          dto.blockedApplications?.length
+        ) {
+          await tx.blockedApplication.createMany({
+            data:
+              dto.blockedApplications.map(
+                (processName) => ({
+                  sessionId:
+                    session.id,
+                  processName,
+                }),
+              ),
+          });
+        }
+
+        return tx.classSession.findUnique({
+          where: {
+            id: session.id,
+          },
+          include: {
+            allowedWebsites: true,
+            blockedWebsites: true,
+            allowedApplications: true,
+            blockedApplications: true,
           },
         });
+      },
+    );
 
-    return {
-      ...created,
+  return {
+    ...created,
 
-      /*
-       * Compatibility alias.
-       *
-       * Frontend currently expects
-       * sessionId.
-       */
-
-      sessionId:
-        created.sessionCode,
-
-      allowedSites:
-        JSON.parse(
-          created.allowedSites,
-        ),
-
-      blockedSites:
-        JSON.parse(
-          created.blockedSites,
-        ),
-    };
-  }
+    sessionId:
+      created?.sessionCode,
+  };
+}
 
   /*
    * ==========================================
@@ -265,13 +389,20 @@ export class SessionsService {
      */
 
     const session =
-      await this.prisma
-        .classSession
-        .findUnique({
-          where: {
-            sessionCode,
-          },
-        });
+  await this.prisma
+    .classSession
+    .findUnique({
+      where: {
+        sessionCode,
+      },
+
+      include: {
+        allowedWebsites: true,
+        blockedWebsites: true,
+        allowedApplications: true,
+        blockedApplications: true,
+      },
+    });
 
     if (!session) {
       throw new NotFoundException(
@@ -558,6 +689,12 @@ export class SessionsService {
           where: {
             sessionCode,
           },
+          include: {
+            allowedWebsites: true,
+            blockedWebsites: true,
+            allowedApplications: true,
+            blockedApplications: true,
+          },
         });
 
     if (
@@ -752,14 +889,72 @@ export class SessionsService {
         status:
           session.status,
 
-        allowedSites:
-          JSON.parse(
-            session.allowedSites,
+        allowInternet:
+          session.allowInternet,
+
+        allowClipboard:
+          session.allowClipboard,
+
+        allowUsb:
+          session.allowUsb,
+
+        allowTaskManager:
+          session.allowTaskManager,
+
+        allowAltTab:
+          session.allowAltTab,
+
+        allowWindowsKey:
+          session.allowWindowsKey,
+
+        allowPrintScreen:
+          session.allowPrintScreen,
+
+        freezeOnEnd:
+          session.freezeOnEnd,
+
+        allowOffline:
+          session.allowOffline,
+
+        restrictExistingFiles:
+          session.restrictExistingFiles,
+
+        restrictUnauthorizedApps:
+          session.restrictUnauthorizedApps,
+
+        warningMinutes:
+          session.warningMinutes,
+
+        screenshotInterval:
+          session.screenshotInterval,
+
+        sessionMode:
+          session.sessionMode,
+
+        questionMode:
+          session.questionMode,
+
+        instructions:
+          session.instructions,
+
+        allowedWebsites:
+          session.allowedWebsites.map(
+            site => site.domain,
           ),
 
-        blockedSites:
-          JSON.parse(
-            session.blockedSites,
+        blockedWebsites:
+          session.blockedWebsites.map(
+            site => site.domain,
+          ),
+
+        allowedApplications:
+          session.allowedApplications.map(
+            app => app.processName,
+          ),
+
+        blockedApplications:
+          session.blockedApplications.map(
+            app => app.processName,
           ),
       },
 
@@ -968,44 +1163,38 @@ export class SessionsService {
           include: {
             _count: {
               select: {
-                participants:
-                  true,
+                participants: true,
               },
             },
+
+            allowedWebsites: true,
+            blockedWebsites: true,
+            allowedApplications: true,
+            blockedApplications: true,
           },
         });
 
     return sessions.map(
       (session) => {
-        let allowedSites:
-          string[] = [];
+        const allowedWebsites =
+          session.allowedWebsites.map(
+            site => site.domain,
+          );
 
-        let blockedSites:
-          string[] = [];
+        const blockedWebsites =
+          session.blockedWebsites.map(
+            site => site.domain,
+          );
 
-        try {
-          allowedSites =
-            JSON.parse(
-              session
-                .allowedSites ||
-                '[]',
-            );
-        } catch {
-          allowedSites =
-            [];
-        }
+        const allowedApplications =
+          session.allowedApplications.map(
+            app => app.processName,
+          );
 
-        try {
-          blockedSites =
-            JSON.parse(
-              session
-                .blockedSites ||
-                '[]',
-            );
-        } catch {
-          blockedSites =
-            [];
-        }
+        const blockedApplications =
+          session.blockedApplications.map(
+            app => app.processName,
+          );
 
         return {
           id:
@@ -1046,9 +1235,61 @@ export class SessionsService {
             session._count
               .participants,
 
-          allowedSites,
+          allowInternet:
+            session.allowInternet,
 
-          blockedSites,
+          allowClipboard:
+            session.allowClipboard,
+
+          allowUsb:
+            session.allowUsb,
+
+          allowTaskManager:
+            session.allowTaskManager,
+
+          allowAltTab:
+            session.allowAltTab,
+
+          allowWindowsKey:
+            session.allowWindowsKey,
+
+          allowPrintScreen:
+            session.allowPrintScreen,
+
+          freezeOnEnd:
+            session.freezeOnEnd,
+
+          allowOffline:
+            session.allowOffline,
+
+          restrictExistingFiles:
+            session.restrictExistingFiles,
+
+          restrictUnauthorizedApps:
+            session.restrictUnauthorizedApps,
+
+          warningMinutes:
+            session.warningMinutes,
+
+          screenshotInterval:
+            session.screenshotInterval,
+
+          sessionMode:
+            session.sessionMode,
+
+          questionMode:
+            session.questionMode,
+
+          instructions:
+            session.instructions,
+
+          allowedWebsites,
+
+          blockedWebsites,
+
+          allowedApplications,
+
+          blockedApplications,
         };
       },
     );
@@ -1465,4 +1706,225 @@ export class SessionsService {
       }
     }
   }
+
+  /*
+ * ==========================================
+ * GET SESSION POLICY
+ * ==========================================
+ */
+
+async getSessionPolicy(
+  sessionId: string,
+) {
+  const session =
+    await this.prisma.classSession.findUnique({
+      where: {
+        id: sessionId,
+      },
+
+      include: {
+        allowedWebsites: true,
+        blockedWebsites: true,
+        allowedApplications: true,
+        blockedApplications: true,
+      },
+    });
+
+  if (!session) {
+    throw new NotFoundException(
+      'Session not found',
+    );
+  }
+
+  return {
+    allowInternet: session.allowInternet,
+    allowClipboard: session.allowClipboard,
+    allowUsb: session.allowUsb,
+    allowTaskManager: session.allowTaskManager,
+    allowAltTab: session.allowAltTab,
+    allowWindowsKey: session.allowWindowsKey,
+    allowPrintScreen: session.allowPrintScreen,
+    allowOffline: session.allowOffline,
+    restrictExistingFiles:
+      session.restrictExistingFiles,
+    restrictUnauthorizedApps:
+      session.restrictUnauthorizedApps,
+    freezeOnEnd: session.freezeOnEnd,
+    warningMinutes:
+      session.warningMinutes,
+    screenshotInterval:
+      session.screenshotInterval,
+    sessionMode:
+      session.sessionMode,
+    questionMode:
+      session.questionMode,
+    instructions:
+      session.instructions,
+
+    allowedWebsites:
+      session.allowedWebsites.map(
+        s => s.domain,
+      ),
+
+    blockedWebsites:
+      session.blockedWebsites.map(
+        s => s.domain,
+      ),
+
+    allowedApplications:
+      session.allowedApplications.map(
+        a => a.processName,
+      ),
+
+    blockedApplications:
+      session.blockedApplications.map(
+        a => a.processName,
+      ),
+  };
+}
+
+/*
+ * ==========================================
+ * UPDATE SESSION POLICY
+ * ==========================================
+ */
+
+async updateSessionPolicy(
+  sessionId: string,
+  dto: UpdateSessionPolicyDto,
+) {
+  await this.prisma.$transaction(
+    async (tx) => {
+      await tx.classSession.update({
+        where: {
+          id: sessionId,
+        },
+
+        data: {
+          allowInternet:
+            dto.allowInternet,
+
+          allowClipboard:
+            dto.allowClipboard,
+
+          allowUsb:
+            dto.allowUsb,
+
+          allowTaskManager:
+            dto.allowTaskManager,
+
+          allowAltTab:
+            dto.allowAltTab,
+
+          allowWindowsKey:
+            dto.allowWindowsKey,
+
+          allowPrintScreen:
+            dto.allowPrintScreen,
+
+          allowOffline:
+            dto.allowOffline,
+
+          restrictExistingFiles:
+            dto.restrictExistingFiles,
+
+          restrictUnauthorizedApps:
+            dto.restrictUnauthorizedApps,
+
+          freezeOnEnd:
+            dto.freezeOnEnd,
+
+          warningMinutes:
+            dto.warningMinutes,
+
+          screenshotInterval:
+            dto.screenshotInterval,
+
+          sessionMode:
+            dto.sessionMode,
+
+          questionMode:
+            dto.questionMode,
+
+          instructions:
+            dto.instructions,
+        },
+      });
+
+      await tx.allowedWebsite.deleteMany({
+        where: {
+          sessionId,
+        },
+      });
+
+      await tx.blockedWebsite.deleteMany({
+        where: {
+          sessionId,
+        },
+      });
+
+      await tx.allowedApplication.deleteMany({
+        where: {
+          sessionId,
+        },
+      });
+
+      await tx.blockedApplication.deleteMany({
+        where: {
+          sessionId,
+        },
+      });
+
+      if (dto.allowedWebsites?.length) {
+        await tx.allowedWebsite.createMany({
+          data: dto.allowedWebsites.map(
+            (domain: string) => ({
+              sessionId,
+              domain,
+            }),
+          ),
+        });
+      }
+
+      if (dto.blockedWebsites?.length) {
+        await tx.blockedWebsite.createMany({
+          data: dto.blockedWebsites.map(
+            (domain: string) => ({
+              sessionId,
+              domain,
+            }),
+          ),
+        });
+      }
+
+      if (dto.allowedApplications?.length) {
+        await tx.allowedApplication.createMany({
+          data:
+            dto.allowedApplications.map(
+              (processName: string) => ({
+                sessionId,
+                processName,
+              }),
+            ),
+        });
+      }
+
+      if (dto.blockedApplications?.length) {
+        await tx.blockedApplication.createMany({
+          data:
+            dto.blockedApplications.map(
+              (processName: string) => ({
+                sessionId,
+                processName,
+              }),
+            ),
+        });
+      }
+    },
+  );
+
+  return this.getSessionPolicy(
+    sessionId,
+  );
+}
 }

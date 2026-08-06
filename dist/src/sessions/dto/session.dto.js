@@ -30,23 +30,46 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateSessionDto.prototype, "joinWindowMinutes", void 0);
 __decorate([
-    (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsString)({ each: true }),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Array)
-], CreateSessionDto.prototype, "allowedSites", void 0);
-__decorate([
-    (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsString)({ each: true }),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Array)
-], CreateSessionDto.prototype, "blockedSites", void 0);
-__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsIn)(['LAB', 'EXAM', 'VIVA']),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateSessionDto.prototype, "sessionMode", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowInternet", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowClipboard", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowUsb", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowTaskManager", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowAltTab", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowWindowsKey", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], CreateSessionDto.prototype, "allowPrintScreen", void 0);
 __decorate([
     (0, class_validator_1.IsBoolean)(),
     (0, class_validator_1.IsOptional)(),
@@ -74,6 +97,12 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateSessionDto.prototype, "warningMinutes", void 0);
 __decorate([
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(5),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], CreateSessionDto.prototype, "screenshotInterval", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
@@ -88,6 +117,30 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateSessionDto.prototype, "questionMode", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateSessionDto.prototype, "allowedWebsites", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateSessionDto.prototype, "blockedWebsites", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateSessionDto.prototype, "allowedApplications", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateSessionDto.prototype, "blockedApplications", void 0);
 class JoinSessionDto {
 }
 exports.JoinSessionDto = JoinSessionDto;

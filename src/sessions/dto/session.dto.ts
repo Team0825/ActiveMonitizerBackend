@@ -21,83 +21,87 @@ export class CreateSessionDto {
   @IsOptional()
   joinWindowMinutes?: number;
 
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  allowedSites?: string[];
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  blockedSites?: string[];
-
   /*
-   * LAB
-   * EXAM
-   * VIVA
+   * ===========================
+   * SESSION MODE
+   * ===========================
    */
+
   @IsString()
   @IsIn(['LAB', 'EXAM', 'VIVA'])
   @IsOptional()
   sessionMode?: 'LAB' | 'EXAM' | 'VIVA';
 
   /*
-   * Allow session to continue locally
-   * when server/internet connection is lost.
-   *
-   * LAB / EXAM can support offline mode.
-   * VIVA will be forced online by the service.
+   * ===========================
+   * SECURITY POLICY
+   * ===========================
    */
+
+  @IsBoolean()
+  @IsOptional()
+  allowInternet?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowClipboard?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowUsb?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowTaskManager?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowAltTab?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowWindowsKey?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  allowPrintScreen?: boolean;
+
   @IsBoolean()
   @IsOptional()
   allowOffline?: boolean;
 
-  /*
-   * Prevent opening existing files
-   * during restricted sessions.
-   */
   @IsBoolean()
   @IsOptional()
   restrictExistingFiles?: boolean;
 
-  /*
-   * Prevent unauthorized applications
-   * from running during the session.
-   */
   @IsBoolean()
   @IsOptional()
   restrictUnauthorizedApps?: boolean;
 
-  /*
-   * Freeze student environment
-   * automatically when session ends.
-   */
   @IsBoolean()
   @IsOptional()
   freezeOnEnd?: boolean;
 
-  /*
-   * Warning before session ends.
-   * Default will be 5 minutes.
-   */
   @IsInt()
   @Min(1)
   @IsOptional()
   warningMinutes?: number;
 
-  /*
-   * Questions or instructions
-   * displayed to students.
-   */
+  @IsInt()
+  @Min(5)
+  @IsOptional()
+  screenshotInterval?: number;
+
   @IsString()
   @IsOptional()
   instructions?: string;
 
   /*
-   * COMMON
-   * INDIVIDUAL
-   * GROUP
+   * ===========================
+   * QUESTION MODE
+   * ===========================
    */
+
   @IsString()
   @IsIn([
     'COMMON',
@@ -109,6 +113,38 @@ export class CreateSessionDto {
     | 'COMMON'
     | 'INDIVIDUAL'
     | 'GROUP';
+
+  /*
+   * ===========================
+   * WEBSITE POLICY
+   * ===========================
+   */
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  allowedWebsites?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  blockedWebsites?: string[];
+
+  /*
+   * ===========================
+   * APPLICATION POLICY
+   * ===========================
+   */
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  allowedApplications?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  blockedApplications?: string[];
 }
 
 export class JoinSessionDto {

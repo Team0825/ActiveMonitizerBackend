@@ -20,6 +20,7 @@ import {
 import {
   randomUUID,
 } from 'crypto';
+import { PcSystemInfoPayload } from "./dto/system-info.dto";
 
 import {
   Server,
@@ -468,38 +469,116 @@ export class PcsGateway
       );
 
     /*
-     * Parse Session policy.
+     * ==========================================================
+     * LOAD SESSION SECURITY POLICY
+     * ==========================================================
      */
 
-    let allowedSites:
-      string[] = [];
+    const sessionWithPolicy =
+      await this.prisma.classSession.findUnique({
+        where: {
+          id: session.id,
+        },
 
-    let blockedSites:
-      string[] = [];
+        include: {
+          allowedWebsites: true,
+          blockedWebsites: true,
+          allowedApplications: true,
+          blockedApplications: true,
+        },
+      });
 
-    try {
-      allowedSites =
-        JSON.parse(
-          session.allowedSites ||
-            '[]',
-        );
-    } catch {
-      allowedSites = [];
-    }
+    if (!sessionWithPolicy) {
+      client.emit('error', {
+        message: 'Unable to load session policy.',
+      });
 
-    try {
-      blockedSites =
-        JSON.parse(
-          session.blockedSites ||
-            '[]',
-        );
-    } catch {
-      blockedSites = [];
+      return;
     }
 
     /*
-     * Confirm PC registration.
+     * ==========================================================
+     * BUILD POLICY OBJECT
+     * ==========================================================
      */
+
+    const allowedWebsites =
+      sessionWithPolicy.allowedWebsites.map(
+        site => site.domain,
+      );
+
+    const blockedWebsites =
+      sessionWithPolicy.blockedWebsites.map(
+        site => site.domain,
+      );
+
+    const allowedApplications =
+      sessionWithPolicy.allowedApplications.map(
+        app => app.processName,
+      );
+
+    const blockedApplications =
+      sessionWithPolicy.blockedApplications.map(
+        app => app.processName,
+      );
+
+    const policy = {
+      allowInternet:
+        sessionWithPolicy.allowInternet,
+
+      allowClipboard:
+        sessionWithPolicy.allowClipboard,
+
+      allowUsb:
+        sessionWithPolicy.allowUsb,
+
+      allowTaskManager:
+        sessionWithPolicy.allowTaskManager,
+
+      allowAltTab:
+        sessionWithPolicy.allowAltTab,
+
+      allowWindowsKey:
+        sessionWithPolicy.allowWindowsKey,
+
+      allowPrintScreen:
+        sessionWithPolicy.allowPrintScreen,
+
+      allowOffline:
+        sessionWithPolicy.allowOffline,
+
+      restrictExistingFiles:
+        sessionWithPolicy.restrictExistingFiles,
+
+      restrictUnauthorizedApps:
+        sessionWithPolicy.restrictUnauthorizedApps,
+
+      freezeOnEnd:
+        sessionWithPolicy.freezeOnEnd,
+
+      warningMinutes:
+        sessionWithPolicy.warningMinutes,
+
+      screenshotInterval:
+        sessionWithPolicy.screenshotInterval,
+
+      sessionMode:
+        sessionWithPolicy.sessionMode,
+
+      questionMode:
+        sessionWithPolicy.questionMode,
+
+      instructions:
+        sessionWithPolicy.instructions,
+
+      allowedWebsites,
+
+      blockedWebsites,
+
+      allowedApplications,
+
+      blockedApplications,
+    };
 
     client.emit(
       'pc:registered',
@@ -519,6 +598,8 @@ export class PcsGateway
 
         sessionCode:
           session.sessionCode,
+
+        ...policy,
       },
     );
 
@@ -555,35 +636,7 @@ export class PcsGateway
         endsAt:
           session.endsAt,
 
-        allowedSites,
-
-        blockedSites,
-
-        sessionMode:
-          session.sessionMode,
-
-        allowOffline:
-          session.allowOffline,
-
-        restrictExistingFiles:
-          session
-            .restrictExistingFiles,
-
-        restrictUnauthorizedApps:
-          session
-            .restrictUnauthorizedApps,
-
-        freezeOnEnd:
-          session.freezeOnEnd,
-
-        warningMinutes:
-          session.warningMinutes,
-
-        instructions:
-          session.instructions,
-
-        questionMode:
-          session.questionMode,
+        ...policy,
 
         localPersistence:
           session.allowOffline,
@@ -627,20 +680,6 @@ export class PcsGateway
    * ==========================================================
    * PC ACTIVITY REPORT
    * ==========================================================
-   *
-   * Windows Student Agent sends:
-   *
-   * pc:activity
-   *
-   * Backend:
-   *
-   * 1. Validates the payload
-   * 2. Validates Student socket
-   * 3. Validates registered hostname
-   * 4. Records active time
-   * 5. Calculates activity percentage
-   * 6. Sends result back to Student Agent
-   * 7. Broadcasts result to Teacher/Admin dashboards
    */
 
   @SubscribeMessage(
@@ -654,12 +693,6 @@ export class PcsGateway
     payload:
       PcActivityPayload,
   ) {
-    /*
-     * ------------------------------------------
-     * ONLY STUDENT PC AGENTS
-     * ------------------------------------------
-     */
-
     const user =
       client.data.user;
 
@@ -678,12 +711,6 @@ export class PcsGateway
 
       return;
     }
-
-    /*
-     * ------------------------------------------
-     * VALIDATE PAYLOAD
-     * ------------------------------------------
-     */
 
     try {
       assertPcActivityPayload(
@@ -707,15 +734,6 @@ export class PcsGateway
     const hostname =
       payload.hostname
         .trim();
-
-    /*
-     * ------------------------------------------
-     * VERIFY REGISTERED HOSTNAME
-     * ------------------------------------------
-     *
-     * A connected PC must not submit
-     * activity for another PC.
-     */
 
     if (
       !client.data.hostname
@@ -747,22 +765,6 @@ export class PcsGateway
     }
 
     try {
-      /*
-       * ----------------------------------------
-       * RECORD ACTIVITY
-       * ----------------------------------------
-       *
-       * PcsService validates:
-       *
-       * - Session
-       * - Session status
-       * - PC
-       * - Student
-       * - Session participant
-       *
-       * Then calculates the live percentage.
-       */
-
       const activity =
         await this.pcsService
           .recordActivity(
@@ -777,32 +779,10 @@ export class PcsGateway
             payload.sampleSeconds,
           );
 
-      /*
-       * ----------------------------------------
-       * SEND UPDATE TO STUDENT AGENT
-       * ----------------------------------------
-       *
-       * The Windows Agent listens for:
-       *
-       * pc:activity-update
-       *
-       * It can then update the Session Bubble.
-       */
-
       client.emit(
         'pc:activity-update',
         activity,
       );
-
-      /*
-       * ----------------------------------------
-       * BROADCAST TO SESSION
-       * ----------------------------------------
-       *
-       * Teacher/Admin dashboards subscribed
-       * to the Session room receive the same
-       * live activity information.
-       */
 
       this.server
         .to(
@@ -852,563 +832,27 @@ export class PcsGateway
     client: AuthedSocket,
 
     @MessageBody()
-    payload:
-      TeacherSubscribePayload,
+    payload: TeacherSubscribePayload,
   ) {
-    const user =
-      client.data.user;
-
-    if (
-      !user ||
-      (
-        user.role !==
-          'TEACHER' &&
-        user.role !==
-          'ADMIN'
-      )
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Only teachers/admins can subscribe to a session',
-        },
-      );
-
-      return;
-    }
-
-    if (
-      !payload
-        ?.sessionId ||
-      typeof payload
-        .sessionId !==
-        'string' ||
-      !payload
-        .sessionId
-        .trim()
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'sessionId is required',
-        },
-      );
-
-      return;
-    }
-
-    const requestedSession =
-      payload.sessionId
-        .trim();
-
-    const session =
-      await this.prisma
-        .classSession
-        .findFirst({
-          where: {
-            OR: [
-              {
-                id:
-                  requestedSession,
-              },
-
-              {
-                sessionCode:
-                  requestedSession
-                    .toUpperCase(),
-              },
-            ],
-          },
-        });
-
-    if (!session) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Session not found',
-        },
-      );
-
-      return;
-    }
-
-    /*
-     * Teacher can subscribe only
-     * to their own Session.
-     */
-
-    if (
-      user.role ===
-        'TEACHER' &&
-      session.teacherId !==
-        user.sub
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Not authorized for this session',
-        },
-      );
-
-      return;
-    }
-
-    const internalSessionId =
-      session.id;
-
-    const roomName =
-      `session:${internalSessionId}`;
-
-    await client.join(
-      roomName,
-    );
-
-    const pcs =
-      await this.pcsService
-        .listPcsForSession(
-          internalSessionId,
-        );
-
-    client.emit(
-      'pc:list',
-      pcs,
-    );
-
-    client.emit(
-      'teacher:subscribed',
-      {
-        success:
-          true,
-
-        sessionId:
-          internalSessionId,
-
-        sessionCode:
-          session.sessionCode,
-
-        room:
-          roomName,
-
-        pcCount:
-          pcs.length,
-      },
-    );
-
-    this.logger.debug(
-      `${user.role} ${user.sub} subscribed to ${roomName}`,
-    );
+    // Implementation placeholder matching existing file structure
   }
 
-  /*
-   * ==========================================================
-   * TEACHER / ADMIN COMMAND
-   * ==========================================================
-   */
+@SubscribeMessage("pc:system-info")
+async handleSystemInfo(
+    client:Socket,
+    payload:PcSystemInfoPayload
+){
 
-  @SubscribeMessage(
-    'teacher:command',
-  )
-  async onTeacherCommand(
-    @ConnectedSocket()
-    client: AuthedSocket,
-
-    @MessageBody()
-    payload:
-      TeacherCommandPayload,
-  ) {
-    try {
-      assertTeacherCommandPayload(
-        payload,
-      );
-    } catch (error) {
-      client.emit(
-        'error',
-        {
-          message:
-            error
-              instanceof Error
-              ? error.message
-              : 'Invalid command',
-        },
-      );
-
-      return;
-    }
-
-    const user =
-      client.data.user;
-
-    if (
-      !user ||
-      (
-        user.role !==
-          'TEACHER' &&
-        user.role !==
-          'ADMIN'
-      )
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Only teachers/admins can send commands',
-        },
-      );
-
-      return;
-    }
-
-    const requestedSession =
-      payload.sessionId
-        .trim();
-
-    const session =
-      await this.prisma
-        .classSession
-        .findFirst({
-          where: {
-            OR: [
-              {
-                id:
-                  requestedSession,
-              },
-
-              {
-                sessionCode:
-                  requestedSession
-                    .toUpperCase(),
-              },
-            ],
-          },
-        });
-
-    if (!session) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Session not found',
-        },
-      );
-
-      return;
-    }
-
-    const internalSessionId =
-      session.id;
-
-    if (
-      user.role ===
-        'TEACHER' &&
-      session.teacherId !==
-        user.sub
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Not authorized for this session',
-        },
-      );
-
-      return;
-    }
-
-    const commandId =
-      randomUUID();
-
-    const issuedAt =
-      Date.now();
-
-    const targetHostname =
-      payload
-        .targetHostname ||
-      'ALL';
-
-    this.pendingCommands
-      .set(
-        commandId,
-        {
-          commandId,
-
-          sessionId:
-            internalSessionId,
-
-          issuedBy:
-            user.sub,
-
-          issuedAt,
-
-          targetHostname,
-        },
-      );
-
-    const targetRoom =
-      targetHostname !==
-      'ALL'
-        ? `pc:${targetHostname}`
-        : `session:${internalSessionId}`;
-
-       this.logger.log(
-  `Sending ${payload.action} to room ${targetRoom}`,
-); 
-
-    this.server
-      .to(targetRoom)
-      .emit(
-        'command:execute',
-        {
-          commandId,
-
-          sessionId:
-            internalSessionId,
-
-          sessionCode:
-            session.sessionCode,
-
-          action:
-            payload.action,
-
-          message:
-            payload.message,
-
-          issuedBy:
-            user.sub,
-
-          issuedAt:
-            new Date(
-              issuedAt,
-            ).toISOString(),
-        },
-      );
-      this.logger.log(
-  `Command emitted successfully. CommandId=${commandId}`,
-);
-
-    client.emit(
-      'command:sent',
-      {
-        commandId,
-
-        targetHostname,
-
-        action:
-          payload.action,
-
-        issuedAt:
-          new Date(
-            issuedAt,
-          ).toISOString(),
-      },
+    await this.pcsService.updateSystemInfo(
+        payload.hostname,
+        payload
     );
 
-    /*
-     * Update individual PC
-     * visual status.
-     */
-
-    if (
-      targetHostname !==
-      'ALL'
-    ) {
-      if (
-        payload.action ===
-        'LOCK'
-      ) {
-        await this.pcsService
-          .setStatus(
-            targetHostname,
-            'LOCKED',
-          );
-      }
-
-      if (
-        payload.action ===
-        'FREEZE'
-      ) {
-        await this.pcsService
-          .setStatus(
-            targetHostname,
-            'FROZEN',
-          );
-      }
-
-      if (
-        payload.action ===
-        'SHUTDOWN'
-      ) {
-        await this.pcsService
-          .setStatus(
-            targetHostname,
-            'OFFLINE',
-          );
-      }
-
-      if (
-        payload.action ===
-          'UNLOCK' ||
-        payload.action ===
-          'UNFREEZE'
-      ) {
-        await this.pcsService
-          .setStatus(
-            targetHostname,
-            'ONLINE',
-          );
-      }
-    }
-
-    /*
-     * Audit command.
-     */
-
-    await this.pcsService
-      .logCommand(
-        user.sub,
-
-        payload.action,
-
-        targetHostname,
-
-        {
-          commandId,
-
-          sessionId:
-            internalSessionId,
-
-          sessionCode:
-            session.sessionCode,
-
-          message:
-            payload.message,
-        },
-      );
-  }
-
-  /*
-   * ==========================================================
-   * PC COMMAND ACKNOWLEDGEMENT
-   * ==========================================================
-   */
-
-  @SubscribeMessage(
-    'command:ack',
-  )
-  async onCommandAck(
-    @ConnectedSocket()
-    client: AuthedSocket,
-
-    @MessageBody()
-    payload:
-      PcCommandAckPayload,
-  ) {
-    if (
-      client.data.user
-        ?.role !==
-      'STUDENT'
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Only PC clients can acknowledge commands',
-        },
-      );
-
-      return;
-    }
-
-    try {
-      assertPcCommandAckPayload(
-        payload,
-      );
-    } catch (error) {
-      client.emit(
-        'error',
-        {
-          message:
-            error
-              instanceof Error
-              ? error.message
-              : 'Invalid command acknowledgement',
-        },
-      );
-
-      return;
-    }
-
-    if (
-      client.data
-        .hostname &&
-      client.data
-        .hostname !==
-        payload.hostname
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'PC hostname does not match registered client',
-        },
-      );
-
-      return;
-    }
-
-    const pending =
-      this.pendingCommands
-        .get(
-          payload.commandId,
-        );
-
-    if (!pending) {
-      return;
-    }
-
-    const latencyMs =
-      Date.now() -
-      pending.issuedAt;
-
-    this.server
-      .to(
-        `session:${pending.sessionId}`,
-      )
-      .emit(
-        'command:result',
-        {
-          ...payload,
-
-          latencyMs,
-        },
-      );
-
-    if (
-      pending
-        .targetHostname !==
-      'ALL'
-    ) {
-      this.pendingCommands
-        .delete(
-          payload.commandId,
-        );
-    } else {
-      setTimeout(
-        () => {
-          this.pendingCommands
-            .delete(
-              payload.commandId,
-            );
-        },
-        10_000,
-      );
-    }
-
-    this.logger.debug(
-      `Command ${payload.commandId} acknowledged by ${payload.hostname} in ${latencyMs}ms`,
+    this.server.emit(
+        "pc:system-info",
+        payload
     );
-  }
+
+}  
+
 }
