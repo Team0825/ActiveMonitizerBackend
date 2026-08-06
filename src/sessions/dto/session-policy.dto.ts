@@ -75,6 +75,10 @@ export class UpdateSessionPolicyDto {
   @IsOptional()
   instructions?: string;
 
+  @IsOptional()
+@IsString()
+startupUrl?: string;
+
   @IsArray()
   @IsOptional()
   allowedWebsites?: string[];

@@ -62,6 +62,7 @@ export declare class StudentSessionController {
             sessionMode: string;
             questionMode: string;
             instructions: string | null;
+            startupUrl: string | null;
             allowedWebsites: string[];
             blockedWebsites: string[];
             allowedApplications: string[];
@@ -120,6 +121,7 @@ export declare class SessionsController {
         sessionMode: string;
         questionMode: string;
         instructions: string | null;
+        startupUrl: string | null;
         allowedWebsites: string[];
         blockedWebsites: string[];
         allowedApplications: string[];
@@ -175,6 +177,7 @@ export declare class SessionsController {
         warningMinutes?: number | undefined;
         screenshotInterval?: number | null | undefined;
         instructions?: string | null | undefined;
+        startupUrl?: string | null | undefined;
         questionMode?: string | undefined;
         sessionCode?: string | undefined;
         policyVersion?: number | undefined;
@@ -209,6 +212,7 @@ export declare class SessionsController {
             sessionMode: string;
             questionMode: string;
             instructions: string | null;
+            startupUrl: string | null;
             allowedWebsites: string[];
             blockedWebsites: string[];
             allowedApplications: string[];
@@ -295,6 +299,7 @@ export declare class SessionsController {
         sessionMode: string;
         questionMode: string;
         instructions: string | null;
+        startupUrl: string | null;
         allowedWebsites: string[];
         blockedWebsites: string[];
         allowedApplications: string[];
@@ -317,6 +322,7 @@ export declare class SessionsController {
         sessionMode: string;
         questionMode: string;
         instructions: string | null;
+        startupUrl: string | null;
         allowedWebsites: string[];
         blockedWebsites: string[];
         allowedApplications: string[];

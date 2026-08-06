@@ -95,6 +95,9 @@ export class CreateSessionDto {
   @IsString()
   @IsOptional()
   instructions?: string;
+  @IsOptional()
+@IsString()
+startupUrl?: string;
 
   /*
    * ===========================

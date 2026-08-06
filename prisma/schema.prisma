@@ -64,6 +64,8 @@ model ClassSession {
 
   instructions String?
 
+  startupUrl String?
+
   policyVersion Int @default(1)
 
   allowedWebsites AllowedWebsite[]

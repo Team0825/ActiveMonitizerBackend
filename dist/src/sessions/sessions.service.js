@@ -93,6 +93,7 @@ let SessionsService = class SessionsService {
                     warningMinutes: dto.warningMinutes ??
                         5,
                     instructions: dto.instructions,
+                    startupUrl: dto.startupUrl,
                     sessionMode: dto.sessionMode ??
                         'LAB',
                     questionMode: dto.questionMode ??
@@ -408,6 +409,7 @@ let SessionsService = class SessionsService {
                 sessionMode: session.sessionMode,
                 questionMode: session.questionMode,
                 instructions: session.instructions,
+                startupUrl: session.startupUrl,
                 allowedWebsites: session.allowedWebsites.map(site => site.domain),
                 blockedWebsites: session.blockedWebsites.map(site => site.domain),
                 allowedApplications: session.allowedApplications.map(app => app.processName),
@@ -558,6 +560,7 @@ let SessionsService = class SessionsService {
                 sessionMode: session.sessionMode,
                 questionMode: session.questionMode,
                 instructions: session.instructions,
+                startupUrl: session.startupUrl,
                 allowedWebsites,
                 blockedWebsites,
                 allowedApplications,
@@ -771,6 +774,7 @@ let SessionsService = class SessionsService {
             sessionMode: session.sessionMode,
             questionMode: session.questionMode,
             instructions: session.instructions,
+            startupUrl: session.startupUrl,
             allowedWebsites: session.allowedWebsites.map(s => s.domain),
             blockedWebsites: session.blockedWebsites.map(s => s.domain),
             allowedApplications: session.allowedApplications.map(a => a.processName),
@@ -800,6 +804,7 @@ let SessionsService = class SessionsService {
                     sessionMode: dto.sessionMode,
                     questionMode: dto.questionMode,
                     instructions: dto.instructions,
+                    startupUrl: dto.startupUrl,
                 },
             });
             await tx.allowedWebsite.deleteMany({

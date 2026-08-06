@@ -15,6 +15,7 @@ export declare class UpdateSessionPolicyDto {
     screenshotInterval?: number;
     warningMinutes?: number;
     instructions?: string;
+    startupUrl?: string;
     allowedWebsites?: string[];
     blockedWebsites?: string[];
     allowedApplications?: string[];

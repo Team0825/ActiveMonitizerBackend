@@ -215,6 +215,9 @@ export class SessionsService {
               instructions:
                 dto.instructions,
 
+              startupUrl:
+                 dto.startupUrl,  
+
               sessionMode:
                 dto.sessionMode ??
                 'LAB',
@@ -936,6 +939,9 @@ export class SessionsService {
 
         instructions:
           session.instructions,
+        
+        startupUrl:
+            session.startupUrl,  
 
         allowedWebsites:
           session.allowedWebsites.map(
@@ -1282,6 +1288,9 @@ export class SessionsService {
 
           instructions:
             session.instructions,
+
+          startupUrl:
+            session.startupUrl,  
 
           allowedWebsites,
 
@@ -1761,6 +1770,9 @@ async getSessionPolicy(
     instructions:
       session.instructions,
 
+    startupUrl:
+    session.startupUrl,
+
     allowedWebsites:
       session.allowedWebsites.map(
         s => s.domain,
@@ -1848,6 +1860,9 @@ async updateSessionPolicy(
 
           instructions:
             dto.instructions,
+          
+          startupUrl:
+    dto.startupUrl,  
         },
       });
 

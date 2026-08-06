@@ -108,6 +108,11 @@ __decorate([
     __metadata("design:type", String)
 ], CreateSessionDto.prototype, "instructions", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateSessionDto.prototype, "startupUrl", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsIn)([
         'COMMON',

@@ -17,6 +17,7 @@ export declare class CreateSessionDto {
     warningMinutes?: number;
     screenshotInterval?: number;
     instructions?: string;
+    startupUrl?: string;
     questionMode?: 'COMMON' | 'INDIVIDUAL' | 'GROUP';
     allowedWebsites?: string[];
     blockedWebsites?: string[];
