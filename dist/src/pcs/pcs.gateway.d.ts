@@ -14,6 +14,7 @@ interface AuthedSocket extends Socket {
             username: string;
         };
         hostname?: string;
+        pcPresence?: boolean;
     };
 }
 export declare class PcsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {

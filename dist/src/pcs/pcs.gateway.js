@@ -37,6 +37,25 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         this.logger.log('Realtime gateway initialized.');
     }
     async handleConnection(client) {
+        const auth = client.handshake.auth ?? {};
+        const presenceMode = auth.mode === 'pc-presence';
+        const presenceHostname = typeof auth.hostname === 'string'
+            ? auth.hostname.trim()
+            : '';
+        if (presenceMode) {
+            if (!presenceHostname) {
+                this.logger.warn(`Rejected PC presence socket ${client.id}: hostname missing`);
+                client.disconnect(true);
+                return;
+            }
+            client.data.hostname =
+                presenceHostname;
+            client.data.pcPresence =
+                true;
+            await this.pcsService.markOnline(presenceHostname);
+            this.logger.log(`PC presence connected: ${client.id} | ${presenceHostname}`);
+            return;
+        }
         const token = client.handshake.auth
             ?.token ||
             client.handshake.query
@@ -47,12 +66,13 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             return;
         }
         try {
-            const payload = await this.jwt
-                .verifyAsync(token);
+            const payload = await this.jwt.verifyAsync(token);
             client.data.user =
                 payload;
+            this.logger.log(`Socket connected: ${client.id} | ${payload.username} | ${payload.role}`);
         }
-        catch {
+        catch (error) {
+            this.logger.error(error);
             this.logger.warn(`Rejected socket ${client.id}: invalid token`);
             client.disconnect(true);
         }
@@ -92,11 +112,12 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             });
             return;
         }
-        if (client.data.user
-            ?.role !==
-            'STUDENT') {
+        const user = client.data.user;
+        const isAgent = !user;
+        const isStudent = user?.role === 'STUDENT';
+        if (!isAgent && !isStudent) {
             client.emit('error', {
-                message: 'Only student clients can register a PC',
+                message: 'Only ActivityMonAgent or Student clients can register a PC',
             });
             return;
         }
@@ -104,8 +125,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             .trim();
         client.data.hostname =
             hostname;
-        await this.pcsService
-            .markOnline(hostname, payload.labName, payload.sessionId, client.data.user.sub);
+        await this.pcsService.markOnline(hostname, payload.labName, payload.sessionId, client.data.user?.sub);
         await client.join(`pc:${hostname}`);
         if (!payload.sessionId) {
             client.emit('pc:registered', {
@@ -153,10 +173,28 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             .emit('pc:status-update', {
             hostname,
             status: 'ONLINE',
-            studentId: client.data.user
-                .sub,
+            studentId: client.data.user?.sub ?? null,
             sessionId: session.id,
             sessionCode: session.sessionCode,
+        });
+        this.sessionRealtimeService.emitPolicyUpdated(session.id, {
+            sessionId: session.id,
+            sessionCode: session.sessionCode,
+            allowInternet: session.allowInternet,
+            allowClipboard: session.allowClipboard,
+            allowUsb: session.allowUsb,
+            allowTaskManager: session.allowTaskManager,
+            allowAltTab: session.allowAltTab,
+            allowWindowsKey: session.allowWindowsKey,
+            allowPrintScreen: session.allowPrintScreen,
+            allowOffline: session.allowOffline,
+            freezeOnEnd: session.freezeOnEnd,
+            warningMinutes: session.warningMinutes,
+            screenshotInterval: session.screenshotInterval,
+            instructions: session.instructions,
+            sessionMode: session.sessionMode,
+            questionMode: session.questionMode,
+            startupUrl: session.startupUrl,
         });
         const sessionWithPolicy = await this.prisma.classSession.findUnique({
             where: {
@@ -196,6 +234,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             sessionMode: sessionWithPolicy.sessionMode,
             questionMode: sessionWithPolicy.questionMode,
             instructions: sessionWithPolicy.instructions,
+            startupUrl: sessionWithPolicy.startupUrl,
             allowedWebsites,
             blockedWebsites,
             allowedApplications,

@@ -242,12 +242,13 @@ let PcsService = class PcsService {
         };
     }
     async updateSystemInfo(hostname, info) {
-        return this.prisma.pc.update({
+        const pc = await this.prisma.pc.update({
             where: {
                 hostname
             },
             data: {
                 agentVersion: info.agentVersion,
+                cpuName: info.processorName,
                 osName: info.osName,
                 osVersion: info.osVersion,
                 osArchitecture: info.osArchitecture,
@@ -258,25 +259,178 @@ let PcsService = class PcsService {
                 lastSyncAt: new Date()
             }
         });
+        await this.prisma.pcHealthReport.create({
+            data: {
+                gpuName: info.gpuName,
+                gpuDriverVersion: info.gpuDriverVersion,
+                uptimeSeconds: info.uptimeSeconds,
+                restartRequired: info.restartRequired,
+                firewallEnabled: info.firewallEnabled,
+                antivirusEnabled: info.antivirusEnabled,
+                pcId: pc.id,
+                agentVersion: info.agentVersion,
+                osName: info.osName,
+                osVersion: info.osVersion,
+                osArchitecture: info.osArchitecture,
+                processArchitecture: info.processArchitecture,
+                processorCount: info.processorCount,
+                dotNetVersion: info.dotNetVersion,
+                ramUsage: info.ramUsage,
+                totalMemoryMb: info.totalMemoryMb,
+                freeMemoryMb: info.freeMemoryMb,
+                diskUsage: info.diskUsage,
+                totalDiskGb: info.totalDiskGb,
+                freeDiskGb: info.freeDiskGb,
+                internetConnected: info.internetConnected,
+                cpuUsagePercent: info.cpuUsage,
+                memoryUsagePercent: info.ramUsagePercent,
+                diskUsagePercent: info.diskUsagePercent,
+                availableMemoryMb: info.freeMemoryMb,
+                availableDiskMb: info.freeDiskGb * 1024,
+                healthStatus: (info.cpuUsage > 90 ||
+                    info.ramUsagePercent > 90 ||
+                    info.diskUsagePercent > 95)
+                    ? "CRITICAL"
+                    : (info.cpuUsage >= 80 ||
+                        info.ramUsagePercent >= 80 ||
+                        info.diskUsagePercent >= 90)
+                        ? "WARNING"
+                        : "GOOD",
+                internetStatus: info.internetConnected
+                    ? "ONLINE"
+                    : "OFFLINE",
+                lastSystemReport: new Date()
+            }
+        });
+        return pc;
     }
     async getHealth() {
+        const LIVE_HEARTBEAT_SECONDS = 15;
+        const liveSince = new Date(Date.now() -
+            LIVE_HEARTBEAT_SECONDS * 1000);
         const pcs = await this.prisma.pc.findMany({
+            where: {
+                status: 'ONLINE',
+                lastSeen: {
+                    gte: liveSince,
+                },
+            },
             orderBy: {
                 hostname: 'asc',
             },
+            include: {
+                healthReports: {
+                    orderBy: {
+                        reportedAt: 'desc',
+                    },
+                    take: 1,
+                },
+            },
         });
-        return pcs.map(pc => ({
-            hostname: pc.hostname,
-            status: pc.status,
-            labName: pc.labName,
-            lastSeen: pc.lastSeen,
-            sessionId: pc.currentSessionId,
-            studentId: pc.currentStudentId,
-            online: pc.status === 'ONLINE',
-            heartbeatAgeSeconds: pc.lastSeen
-                ? Math.floor((Date.now() - new Date(pc.lastSeen).getTime()) / 1000)
-                : -1,
-        }));
+        return pcs.map(pc => {
+            const health = pc.healthReports[0] ?? null;
+            return {
+                hostname: pc.hostname,
+                displayName: pc.displayName,
+                labName: pc.labName,
+                status: pc.status,
+                online: pc.status === 'ONLINE',
+                lastSeen: pc.lastSeen,
+                heartbeatAgeSeconds: pc.lastSeen
+                    ? Math.floor((Date.now() - pc.lastSeen.getTime()) / 1000)
+                    : null,
+                sessionId: pc.currentSessionId,
+                studentId: pc.currentStudentId,
+                os: {
+                    name: pc.osName,
+                    version: pc.osVersion,
+                    architecture: pc.osArchitecture,
+                },
+                cpu: {
+                    name: pc.cpuName,
+                    usagePercent: health?.cpuUsagePercent ?? null,
+                    processorCount: health?.processorCount ?? null,
+                },
+                gpu: {
+                    name: health?.gpuName ??
+                        pc.gpuName ??
+                        null,
+                    driverVersion: health?.gpuDriverVersion ??
+                        pc.gpuDriverVersion ??
+                        null,
+                },
+                memory: {
+                    totalMb: health?.totalMemoryMb ??
+                        pc.totalMemoryMb,
+                    availableMb: health?.availableMemoryMb ??
+                        pc.availableMemoryMb,
+                    usedMb: health?.totalMemoryMb != null &&
+                        health?.availableMemoryMb != null
+                        ? health.totalMemoryMb -
+                            health.availableMemoryMb
+                        : pc.totalMemoryMb != null &&
+                            pc.availableMemoryMb != null
+                            ? pc.totalMemoryMb -
+                                pc.availableMemoryMb
+                            : null,
+                    usagePercent: health?.memoryUsagePercent ?? null,
+                },
+                disk: {
+                    totalMb: health?.totalDiskGb != null
+                        ? health.totalDiskGb * 1024
+                        : pc.totalDiskMb,
+                    availableMb: health?.freeDiskGb != null
+                        ? health.freeDiskGb * 1024
+                        : pc.availableDiskMb,
+                    usedMb: health?.totalDiskGb != null &&
+                        health?.freeDiskGb != null
+                        ? (health.totalDiskGb * 1024) -
+                            (health.freeDiskGb * 1024)
+                        : pc.totalDiskMb != null &&
+                            pc.availableDiskMb != null
+                            ? pc.totalDiskMb -
+                                pc.availableDiskMb
+                            : null,
+                    usagePercent: health?.diskUsagePercent ?? null,
+                },
+                agent: {
+                    version: health?.agentVersion ??
+                        pc.agentVersion,
+                    clientVersion: pc.clientVersion,
+                    dotNetVersion: health?.dotNetVersion ?? null,
+                    processArchitecture: health?.processArchitecture ?? null,
+                },
+                system: {
+                    uptimeSeconds: health?.uptimeSeconds ??
+                        pc.uptimeSeconds ??
+                        null,
+                    restartRequired: health?.restartRequired ??
+                        pc.restartRequired ??
+                        null,
+                },
+                security: {
+                    firewallEnabled: health?.firewallEnabled ??
+                        pc.firewallEnabled ??
+                        null,
+                    antivirusEnabled: health?.antivirusEnabled ??
+                        pc.antivirusEnabled ??
+                        null,
+                },
+                healthStatus: health?.healthStatus ??
+                    pc.healthStatus,
+                updateStatus: pc.updateStatus,
+                internetStatus: health?.internetStatus ??
+                    pc.internetStatus,
+                internetConnected: health?.internetConnected ?? null,
+                latencyMs: health?.latencyMs ??
+                    pc.latencyMs,
+                lastHealthCheck: pc.lastHealthCheck,
+                lastSystemReport: health?.lastSystemReport ?? null,
+                lastSyncAt: pc.lastSyncAt,
+                registeredAt: pc.registeredAt,
+                updatedAt: pc.updatedAt,
+            };
+        });
     }
 };
 exports.PcsService = PcsService;

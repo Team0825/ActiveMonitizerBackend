@@ -126,11 +126,21 @@ model Pc {
   osName         String?
   osVersion      String?
 
-  cpuName           String?
+    cpuName           String?
+
+  gpuName           String?
+  gpuDriverVersion  String?
+
   totalMemoryMb     Int?
   availableMemoryMb Int?
+
   totalDiskMb       Int?
   availableDiskMb   Int?
+
+  uptimeSeconds     Int?
+  restartRequired   Boolean?
+  firewallEnabled   Boolean?
+  antivirusEnabled  Boolean?
 
   agentVersion  String?
   clientVersion String?
@@ -161,13 +171,21 @@ model Pc {
 }
 
 model PcHealthReport {
-  agentVersion        String?
+   agentVersion        String?
   osName              String?
   osVersion           String?
   osArchitecture      String?
   processArchitecture String?
 
   processorCount Int?
+
+  gpuName          String?
+  gpuDriverVersion String?
+
+  uptimeSeconds    Int?
+  restartRequired  Boolean?
+  firewallEnabled  Boolean?
+  antivirusEnabled Boolean?
 
   dotNetVersion String?
 

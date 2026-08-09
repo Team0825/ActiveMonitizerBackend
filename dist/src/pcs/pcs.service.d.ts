@@ -18,10 +18,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -46,10 +52,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -74,10 +86,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -102,10 +120,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -130,10 +154,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -180,10 +210,16 @@ export declare class PcsService {
         osName: string | null;
         osVersion: string | null;
         cpuName: string | null;
+        gpuName: string | null;
+        gpuDriverVersion: string | null;
         totalMemoryMb: number | null;
         availableMemoryMb: number | null;
         totalDiskMb: number | null;
         availableDiskMb: number | null;
+        uptimeSeconds: number | null;
+        restartRequired: boolean | null;
+        firewallEnabled: boolean | null;
+        antivirusEnabled: boolean | null;
         agentVersion: string | null;
         clientVersion: string | null;
         updateStatus: string;
@@ -196,12 +232,63 @@ export declare class PcsService {
     }>;
     getHealth(): Promise<{
         hostname: string;
-        status: string;
+        displayName: string | null;
         labName: string | null;
+        status: string;
+        online: boolean;
         lastSeen: Date | null;
+        heartbeatAgeSeconds: number | null;
         sessionId: string | null;
         studentId: string | null;
-        online: boolean;
-        heartbeatAgeSeconds: number;
+        os: {
+            name: string | null;
+            version: string | null;
+            architecture: string | null;
+        };
+        cpu: {
+            name: string | null;
+            usagePercent: number | null;
+            processorCount: number | null;
+        };
+        gpu: {
+            name: string | null;
+            driverVersion: string | null;
+        };
+        memory: {
+            totalMb: number | null;
+            availableMb: number | null;
+            usedMb: number | null;
+            usagePercent: number | null;
+        };
+        disk: {
+            totalMb: number | null;
+            availableMb: number | null;
+            usedMb: number | null;
+            usagePercent: number | null;
+        };
+        agent: {
+            version: string | null;
+            clientVersion: string | null;
+            dotNetVersion: string | null;
+            processArchitecture: string | null;
+        };
+        system: {
+            uptimeSeconds: number | null;
+            restartRequired: boolean | null;
+        };
+        security: {
+            firewallEnabled: boolean | null;
+            antivirusEnabled: boolean | null;
+        };
+        healthStatus: string;
+        updateStatus: string;
+        internetStatus: string;
+        internetConnected: boolean | null;
+        latencyMs: number | null;
+        lastHealthCheck: Date | null;
+        lastSystemReport: Date | null;
+        lastSyncAt: Date | null;
+        registeredAt: Date;
+        updatedAt: Date;
     }[]>;
 }

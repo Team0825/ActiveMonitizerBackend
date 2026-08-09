@@ -642,70 +642,408 @@ export class PcsService {
  * ============================================================
  */
 async updateSystemInfo(
-    hostname:string,
-    info:PcSystemInfoPayload
-){
-    return this.prisma.pc.update({
+    hostname: string,
+    info: PcSystemInfoPayload
+) {
+    const pc = await this.prisma.pc.update({
 
-        where:{
+        where: {
             hostname
         },
 
         data: {
+            agentVersion: info.agentVersion,
 
-    agentVersion: info.agentVersion,
+            cpuName: info.processorName,
 
-    osName: info.osName,
+            osName: info.osName,
 
-    osVersion: info.osVersion,
+            osVersion: info.osVersion,
 
-    osArchitecture: info.osArchitecture,
+            osArchitecture: info.osArchitecture,
 
-    totalMemoryMb: info.totalMemoryMb,
+            totalMemoryMb: info.totalMemoryMb,
 
-    availableMemoryMb: info.freeMemoryMb,
+            availableMemoryMb: info.freeMemoryMb,
 
-    totalDiskMb: info.totalDiskGb * 1024,
+            totalDiskMb: info.totalDiskGb * 1024,
 
-    availableDiskMb: info.freeDiskGb * 1024,
+            availableDiskMb: info.freeDiskGb * 1024,
 
-    lastSyncAt: new Date()
-
-}
-
+            lastSyncAt: new Date()
+        }
     });
 
+    await this.prisma.pcHealthReport.create({
+
+        data: {
+
+          gpuName: info.gpuName,
+
+gpuDriverVersion: info.gpuDriverVersion,
+
+uptimeSeconds: info.uptimeSeconds,
+
+restartRequired: info.restartRequired,
+
+firewallEnabled: info.firewallEnabled,
+
+antivirusEnabled: info.antivirusEnabled,
+            pcId: pc.id,
+
+            agentVersion: info.agentVersion,
+
+            osName: info.osName,
+
+            osVersion: info.osVersion,
+
+            osArchitecture: info.osArchitecture,
+
+            processArchitecture:
+                info.processArchitecture,
+
+            processorCount:
+                info.processorCount,
+
+            dotNetVersion:
+                info.dotNetVersion,
+
+            ramUsage:
+                info.ramUsage,
+
+            totalMemoryMb:
+                info.totalMemoryMb,
+
+            freeMemoryMb:
+                info.freeMemoryMb,
+
+            diskUsage:
+                info.diskUsage,
+
+            totalDiskGb:
+                info.totalDiskGb,
+
+            freeDiskGb:
+                info.freeDiskGb,
+
+            internetConnected:
+                info.internetConnected,
+
+            cpuUsagePercent:
+                info.cpuUsage,
+
+            memoryUsagePercent:
+                info.ramUsagePercent,
+
+            diskUsagePercent:
+                info.diskUsagePercent,
+
+            availableMemoryMb:
+    info.freeMemoryMb,
+
+availableDiskMb:
+    info.freeDiskGb * 1024,
+
+healthStatus:
+    (
+        info.cpuUsage > 90 ||
+        info.ramUsagePercent > 90 ||
+        info.diskUsagePercent > 95
+    )
+        ? "CRITICAL"
+        : (
+            info.cpuUsage >= 80 ||
+            info.ramUsagePercent >= 80 ||
+            info.diskUsagePercent >= 90
+        )
+            ? "WARNING"
+            : "GOOD",
+
+            internetStatus:
+                info.internetConnected
+                    ? "ONLINE"
+                    : "OFFLINE",
+
+            lastSystemReport:
+                new Date()
+        }
+    });
+
+    return pc;
 }
 
 async getHealth() {
+  /*
+   * ============================================================
+   * LIVE PC HEALTH
+   * ============================================================
+   *
+   * Only PCs that have sent a heartbeat recently are returned.
+   *
+   * Old database records are NOT shown in Live Health.
+   */
+
+  const LIVE_HEARTBEAT_SECONDS = 15;
+
+  const liveSince = new Date(
+    Date.now() -
+      LIVE_HEARTBEAT_SECONDS * 1000,
+  );
+
   const pcs = await this.prisma.pc.findMany({
+    where: {
+      status: 'ONLINE',
+
+      lastSeen: {
+        gte: liveSince,
+      },
+    },
+
     orderBy: {
       hostname: 'asc',
     },
+
+    include: {
+      healthReports: {
+        orderBy: {
+          reportedAt: 'desc',
+        },
+
+        take: 1,
+      },
+    },
   });
+  return pcs.map(pc => {
+    const health = pc.healthReports[0] ?? null;
 
-  return pcs.map(pc => ({
-    hostname: pc.hostname,
+    return {
+      // ============================================================
+      // BASIC PC STATUS
+      // ============================================================
 
-    status: pc.status,
+      hostname: pc.hostname,
+      displayName: pc.displayName,
+      labName: pc.labName,
 
-    labName: pc.labName,
+      status: pc.status,
 
-    lastSeen: pc.lastSeen,
+      online: pc.status === 'ONLINE',
 
-    sessionId: pc.currentSessionId,
+      lastSeen: pc.lastSeen,
 
-    studentId: pc.currentStudentId,
+      heartbeatAgeSeconds:
+        pc.lastSeen
+          ? Math.floor(
+              (Date.now() - pc.lastSeen.getTime()) / 1000,
+            )
+          : null,
 
-    online: pc.status === 'ONLINE',
+      // ============================================================
+      // SESSION
+      // ============================================================
 
-    heartbeatAgeSeconds:
-    pc.lastSeen
-        ? Math.floor(
-            (Date.now() - new Date(pc.lastSeen).getTime()) / 1000
-          )
-        : -1,
-  }));
+      sessionId: pc.currentSessionId,
+      studentId: pc.currentStudentId,
+
+      // ============================================================
+      // OPERATING SYSTEM
+      // ============================================================
+
+      os: {
+        name: pc.osName,
+        version: pc.osVersion,
+        architecture: pc.osArchitecture,
+      },
+
+      // ============================================================
+      // CPU
+      // ============================================================
+
+      cpu: {
+        name: pc.cpuName,
+
+        usagePercent:
+          health?.cpuUsagePercent ?? null,
+
+        processorCount:
+          health?.processorCount ?? null,
+      },
+
+            // ============================================================
+      // GPU
+      // ============================================================
+
+      gpu: {
+        name:
+          health?.gpuName ??
+          pc.gpuName ??
+          null,
+
+        driverVersion:
+          health?.gpuDriverVersion ??
+          pc.gpuDriverVersion ??
+          null,
+      },
+
+      // ============================================================
+      // MEMORY
+      // ============================================================
+
+      memory: {
+        totalMb:
+          health?.totalMemoryMb ??
+          pc.totalMemoryMb,
+
+        availableMb:
+          health?.availableMemoryMb ??
+          pc.availableMemoryMb,
+
+        usedMb:
+          health?.totalMemoryMb != null &&
+          health?.availableMemoryMb != null
+            ? health.totalMemoryMb -
+              health.availableMemoryMb
+            : pc.totalMemoryMb != null &&
+              pc.availableMemoryMb != null
+              ? pc.totalMemoryMb -
+                pc.availableMemoryMb
+              : null,
+
+        usagePercent:
+          health?.memoryUsagePercent ?? null,
+      },
+
+      // ============================================================
+      // STORAGE
+      // ============================================================
+
+      disk: {
+  totalMb:
+    health?.totalDiskGb != null
+      ? health.totalDiskGb * 1024
+      : pc.totalDiskMb,
+
+  availableMb:
+    health?.freeDiskGb != null
+      ? health.freeDiskGb * 1024
+      : pc.availableDiskMb,
+
+  usedMb:
+    health?.totalDiskGb != null &&
+    health?.freeDiskGb != null
+      ? (health.totalDiskGb * 1024) -
+        (health.freeDiskGb * 1024)
+      : pc.totalDiskMb != null &&
+        pc.availableDiskMb != null
+        ? pc.totalDiskMb -
+          pc.availableDiskMb
+        : null,
+
+  usagePercent:
+    health?.diskUsagePercent ?? null,
+},
+
+      // ============================================================
+      // AGENT
+      // ============================================================
+
+      agent: {
+        version:
+          health?.agentVersion ??
+          pc.agentVersion,
+
+        clientVersion:
+          pc.clientVersion,
+
+        dotNetVersion:
+          health?.dotNetVersion ?? null,
+
+        processArchitecture:
+          health?.processArchitecture ?? null,
+      },
+
+            // ============================================================
+      // SYSTEM
+      // ============================================================
+
+      system: {
+        uptimeSeconds:
+          health?.uptimeSeconds ??
+          pc.uptimeSeconds ??
+          null,
+
+        restartRequired:
+          health?.restartRequired ??
+          pc.restartRequired ??
+          null,
+      },
+
+      // ============================================================
+      // SECURITY
+      // ============================================================
+
+      security: {
+        firewallEnabled:
+          health?.firewallEnabled ??
+          pc.firewallEnabled ??
+          null,
+
+        antivirusEnabled:
+          health?.antivirusEnabled ??
+          pc.antivirusEnabled ??
+          null,
+      },
+
+      // ============================================================
+      // HEALTH / UPDATE STATUS
+      // ============================================================
+
+      healthStatus:
+        health?.healthStatus ??
+        pc.healthStatus,
+
+      updateStatus:
+        pc.updateStatus,
+
+      // ============================================================
+      // NETWORK
+      // ============================================================
+
+      internetStatus:
+        health?.internetStatus ??
+        pc.internetStatus,
+
+      internetConnected:
+        health?.internetConnected ?? null,
+
+      latencyMs:
+        health?.latencyMs ??
+        pc.latencyMs,
+
+      // ============================================================
+      // HEALTH REPORT
+      // ============================================================
+
+      lastHealthCheck:
+        pc.lastHealthCheck,
+
+      lastSystemReport:
+        health?.lastSystemReport ?? null,
+
+      lastSyncAt:
+        pc.lastSyncAt,
+
+      // ============================================================
+      // TIMESTAMPS
+      // ============================================================
+
+      registeredAt:
+        pc.registeredAt,
+
+      updatedAt:
+        pc.updatedAt,
+    };
+  });
 }
 
 

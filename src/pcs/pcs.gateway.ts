@@ -70,6 +70,13 @@ interface AuthedSocket extends Socket {
     };
 
     hostname?: string;
+
+    /*
+     * Machine-level PC presence connection.
+     *
+     * This is independent of student login.
+     */
+    pcPresence?: boolean;
   };
 }
 
@@ -175,44 +182,115 @@ export class PcsGateway
    */
 
   async handleConnection(
-    client: AuthedSocket,
-  ) {
-    const token =
-      (
-        client.handshake.auth
-          ?.token as string
-      ) ||
-      (
-        client.handshake.query
-          ?.token as string
-      );
+  client: AuthedSocket,
+) {
+  const auth =
+    client.handshake.auth ?? {};
 
-    if (!token) {
-      this.logger.warn(
-        `Rejected socket ${client.id}: no token`,
-      );
+  /*
+   * ============================================================
+   * PC PRESENCE CONNECTION
+   * ============================================================
+   *
+   * This connection is created by the Windows Agent itself.
+   *
+   * It does NOT require student login.
+   *
+   * PC hostname is the machine identity.
+   */
 
-      client.disconnect(true);
+  const presenceMode =
+    auth.mode === 'pc-presence';
 
-      return;
-    }
+  const presenceHostname =
+    typeof auth.hostname === 'string'
+      ? auth.hostname.trim()
+      : '';
 
-    try {
-      const payload =
-        await this.jwt
-          .verifyAsync(token);
+  
+  if (presenceMode) {
+  if (!presenceHostname) {
+    this.logger.warn(
+      `Rejected PC presence socket ${client.id}: hostname missing`,
+    );
 
-      client.data.user =
-        payload;
-    } catch {
-      this.logger.warn(
-        `Rejected socket ${client.id}: invalid token`,
-      );
+    client.disconnect(true);
 
-      client.disconnect(true);
-    }
+    return;
   }
 
+  client.data.hostname =
+  presenceHostname;
+
+client.data.pcPresence =
+  true;
+
+/*
+ * Register physical PC as ONLINE.
+ *
+ * No student/session is attached here.
+ * Hostname is the machine identity.
+ */
+await this.pcsService.markOnline(
+  presenceHostname,
+);
+
+this.logger.log(
+  `PC presence connected: ${client.id} | ${presenceHostname}`,
+);
+
+return;
+}
+
+  /*
+   * ============================================================
+   * NORMAL AUTHENTICATED CONNECTION
+   * ============================================================
+   *
+   * Existing Student / Teacher / Admin
+   * realtime authentication remains unchanged.
+   */
+
+  const token =
+    (
+      client.handshake.auth
+        ?.token as string
+    ) ||
+    (
+      client.handshake.query
+        ?.token as string
+    );
+
+  if (!token) {
+    this.logger.warn(
+      `Rejected socket ${client.id}: no token`,
+    );
+
+    client.disconnect(true);
+
+    return;
+  }
+
+  try {
+    const payload =
+      await this.jwt.verifyAsync(token);
+
+    client.data.user =
+      payload;
+
+    this.logger.log(
+      `Socket connected: ${client.id} | ${payload.username} | ${payload.role}`,
+    );
+  } catch (error) {
+    this.logger.error(error);
+
+    this.logger.warn(
+      `Rejected socket ${client.id}: invalid token`,
+    );
+
+    client.disconnect(true);
+  }
+}
   /*
    * ==========================================================
    * DISCONNECT
@@ -297,27 +375,43 @@ export class PcsGateway
       return;
     }
 
-    /*
-     * Only Student PC clients
-     * can register a PC.
-     */
+  /*
+ * ==========================================================
+ * PC REGISTRATION AUTHORIZATION
+ * ==========================================================
+ *
+ * Two types of clients can register:
+ *
+ * 1. ActivityMonAgent
+ *    - Can register without a user JWT.
+ *    - Used to keep the physical PC LIVE.
+ *
+ * 2. Authenticated Student
+ *    - Can register a PC together with a session.
+ *    - Used for Student ↔ PC ↔ Session allocation.
+ *
+ * Teacher/Admin clients cannot register PCs.
+ */
 
-    if (
-      client.data.user
-        ?.role !==
-      'STUDENT'
-    ) {
-      client.emit(
-        'error',
-        {
-          message:
-            'Only student clients can register a PC',
-        },
-      );
+const user = client.data.user;
 
-      return;
-    }
+const isAgent =
+  !user;
 
+const isStudent =
+  user?.role === 'STUDENT';
+
+if (!isAgent && !isStudent) {
+  client.emit(
+    'error',
+    {
+      message:
+        'Only ActivityMonAgent or Student clients can register a PC',
+    },
+  );
+
+  return;
+}
     const hostname =
       payload.hostname
         .trim();
@@ -329,13 +423,12 @@ export class PcsGateway
      * Register PC as ONLINE.
      */
 
-    await this.pcsService
-      .markOnline(
-        hostname,
-        payload.labName,
-        payload.sessionId,
-        client.data.user.sub,
-      );
+    await this.pcsService.markOnline(
+  hostname,
+  payload.labName,
+  payload.sessionId,
+  client.data.user?.sub,
+);
 
     /*
      * Every PC gets its
@@ -457,16 +550,50 @@ export class PcsGateway
             'ONLINE',
 
           studentId:
-            client.data.user
-              .sub,
+  client.data.user?.sub ?? null,
 
-          sessionId:
-            session.id,
+sessionId:
+  session.id,
 
           sessionCode:
             session.sessionCode,
         },
       );
+
+      /*
+ * ==========================================================
+ * SEND INITIAL SESSION POLICY TO NEWLY REGISTERED AGENT
+ * ==========================================================
+ */
+
+this.sessionRealtimeService.emitPolicyUpdated(
+  session.id,
+  {
+    sessionId: session.id,
+    sessionCode: session.sessionCode,
+
+    allowInternet: session.allowInternet,
+    allowClipboard: session.allowClipboard,
+    allowUsb: session.allowUsb,
+    allowTaskManager: session.allowTaskManager,
+    allowAltTab: session.allowAltTab,
+    allowWindowsKey: session.allowWindowsKey,
+    allowPrintScreen: session.allowPrintScreen,
+    allowOffline: session.allowOffline,
+
+    freezeOnEnd: session.freezeOnEnd,
+
+    warningMinutes: session.warningMinutes,
+    screenshotInterval: session.screenshotInterval,
+
+    instructions: session.instructions,
+    sessionMode: session.sessionMode,
+    questionMode: session.questionMode,
+
+    startupUrl: session.startupUrl,
+
+  },
+);
 
     /*
      * ==========================================================
@@ -570,6 +697,9 @@ export class PcsGateway
 
       instructions:
         sessionWithPolicy.instructions,
+
+      startupUrl:
+        sessionWithPolicy.startupUrl,
 
       allowedWebsites,
 
