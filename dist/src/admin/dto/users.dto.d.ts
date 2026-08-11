@@ -13,6 +13,13 @@ export declare class CreateTeacherDto {
     mobile?: string;
     email?: string;
 }
+export declare class CreateAdminDto {
+    name?: string;
+    username: string;
+    password: string;
+    mobile?: string;
+    email?: string;
+}
 export declare class UpdateUserDto {
     name?: string;
     username?: string;

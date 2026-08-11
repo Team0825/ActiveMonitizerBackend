@@ -68,12 +68,35 @@ export class CreateStudentDto {
 export class CreateTeacherDto {
   /**
    * Teacher full name.
-   *
-   * Requires:
-   * name String?
-   *
-   * inside the Prisma User model.
    */
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(4)
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  mobile?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+}
+
+/**
+ * =========================================================
+ * CREATE ADMIN DTO
+ * =========================================================
+ */
+export class CreateAdminDto {
   @IsOptional()
   @IsString()
   name?: string;

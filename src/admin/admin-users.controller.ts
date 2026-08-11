@@ -124,6 +124,30 @@ export class AdminUsersController {
 
   /*
    * ==========================================================
+   * CREATE ADMIN
+   * ==========================================================
+   *
+   * POST /admin/users/admins
+   *
+   * ADMIN ONLY
+   */
+
+  @Post('admins')
+  createAdmin(
+    @Req()
+    req: AuthenticatedRequest,
+
+    @Body()
+    dto: { name?: string; username: string; password: string; mobile?: string; email?: string },
+  ) {
+    return this.usersService.createAdmin(
+      req.user.sub,
+      dto,
+    );
+  }
+
+  /*
+   * ==========================================================
    * LIST USERS
    * ==========================================================
    *
@@ -133,6 +157,7 @@ export class AdminUsersController {
    *
    * ?role=STUDENT
    * ?role=TEACHER
+   * ?role=ADMIN
    * ?classId=CSE
    *
    * Examples:
@@ -140,6 +165,8 @@ export class AdminUsersController {
    * /admin/users?role=STUDENT
    *
    * /admin/users?role=TEACHER
+   *
+   * /admin/users?role=ADMIN
    *
    * /admin/users?role=STUDENT&classId=CSE
    *
@@ -151,7 +178,8 @@ export class AdminUsersController {
     @Query('role')
     role?:
       | 'STUDENT'
-      | 'TEACHER',
+      | 'TEACHER'
+      | 'ADMIN',
 
     @Query('classId')
     classId?: string,

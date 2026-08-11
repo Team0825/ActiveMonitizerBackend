@@ -42,6 +42,11 @@ model User {
   messagesSent     Message[] @relation("MessageSender")
   messagesReceived Message[] @relation("MessageRecipient")
 
+  questionPapers QuestionPaper[] @relation("QuestionPaperCreator")
+  examsCreated   Exam[]          @relation("ExamCreator")
+  examAttempts   ExamAttempt[]   @relation("StudentExamAttempts")
+  examResults    ExamResult[]    @relation("StudentExamResults")
+
   @@index([role])
   @@index([classId])
   @@index([rollNumber])
@@ -103,6 +108,7 @@ model ClassSession {
   accessRequests    SpecialAccessRequest[]
   messages          Message[]
   SessionPolicyLog  SessionPolicyLog[]
+  exams             Exam[]
 
   @@index([status])
   @@index([createdAt])
@@ -523,3 +529,183 @@ model AgentTheme {
 
   @@index([isActive])
 }
+
+model QuestionPaper {
+  id           String   @id @default(uuid())
+  title        String
+  subject      String
+  description  String?
+  totalMarks   Float    @default(100.0)
+  passingMarks Float    @default(40.0)
+
+  createdById  String
+  createdBy    User     @relation("QuestionPaperCreator", fields: [createdById], references: [id])
+
+  questions    Question[]
+  exams        Exam[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdById])
+  @@index([subject])
+}
+
+model Question {
+  id              String         @id @default(uuid())
+  questionPaperId String
+  questionPaper   QuestionPaper  @relation(fields: [questionPaperId], references: [id], onDelete: Cascade)
+
+  questionText    String
+  questionType    String         @default("MCQ")
+  section         String         @default("General")
+  orderIndex      Int            @default(0)
+  options         Json
+  correctAnswer   String
+  marks           Float          @default(1.0)
+  negativeMarks   Float          @default(0.0)
+  explanation     String?
+  imageUrl        String?
+
+  answers         ExamAnswer[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([questionPaperId])
+  @@index([orderIndex])
+}
+
+model Exam {
+  id                  String         @id @default(uuid())
+  title               String
+  subject             String
+  description         String?
+  instructions        String?
+
+  questionPaperId     String
+  questionPaper       QuestionPaper  @relation(fields: [questionPaperId], references: [id])
+
+  sessionId           String?
+  session             ClassSession?  @relation(fields: [sessionId], references: [id])
+
+  createdById         String
+  createdBy           User           @relation("ExamCreator", fields: [createdById], references: [id])
+
+  durationMinutes     Int            @default(60)
+  totalMarks          Float          @default(100.0)
+  passingMarks        Float          @default(40.0)
+
+  shuffleQuestions    Boolean        @default(false)
+  shuffleOptions      Boolean        @default(false)
+  allowReview         Boolean        @default(true)
+  autoSubmitOnTimeUp  Boolean        @default(true)
+
+  status              String         @default("DRAFT")
+  resultVisibility    String         @default("AFTER_PUBLISH")
+  resultPublished     Boolean        @default(false)
+
+  startsAt            DateTime?
+  endsAt              DateTime?
+
+  attempts            ExamAttempt[]
+  results             ExamResult[]
+
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([questionPaperId])
+  @@index([sessionId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model ExamAttempt {
+  id                   String       @id @default(uuid())
+  examId               String
+  exam                 Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  studentId            String
+  student              User         @relation("StudentExamAttempts", fields: [studentId], references: [id])
+
+  sessionId            String?
+  pcHostname           String?
+
+  status               String       @default("IN_PROGRESS")
+  startedAt            DateTime     @default(now())
+  submittedAt          DateTime?
+  clientIp             String?
+  timeRemainingSeconds Int?
+
+  answers              ExamAnswer[]
+  result               ExamResult?
+
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+}
+
+model ExamAnswer {
+  id                String       @id @default(uuid())
+  attemptId         String
+  attempt           ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  questionId        String
+  question          Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedOption    String?
+  answerText        String?
+  isMarkedForReview Boolean      @default(false)
+
+  savedAt           DateTime     @default(now())
+  isEvaluated       Boolean      @default(false)
+  isCorrect         Boolean?
+  marksObtained     Float        @default(0.0)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model ExamResult {
+  id              String       @id @default(uuid())
+  examId          String
+  exam            Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  attemptId       String       @unique
+  attempt         ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  studentId       String
+  student         User         @relation("StudentExamResults", fields: [studentId], references: [id])
+
+  sessionId       String?
+
+  totalQuestions  Int
+  attemptedCount  Int
+  correctCount    Int
+  wrongCount      Int
+  unansweredCount Int
+
+  totalMarks      Float
+  obtainedMarks   Float
+  percentage      Float
+  grade           String?
+  isPassed        Boolean
+
+  status          String       @default("EVALUATED")
+  evaluatedAt     DateTime     @default(now())
+  publishedAt     DateTime?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+}
+

@@ -29,7 +29,26 @@ export declare class AdminUsersService {
         createdAt: Date;
         updatedAt: Date;
     }>;
-    listUsers(role?: 'STUDENT' | 'TEACHER', classId?: string): Promise<{
+    createAdmin(adminId: string, dto: {
+        name?: string;
+        username: string;
+        password: string;
+        mobile?: string;
+        email?: string;
+    }): Promise<{
+        id: string;
+        username: string;
+        regNumber: string | null;
+        email: string | null;
+        role: string;
+        name: string | null;
+        mobile: string | null;
+        classId: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    listUsers(role?: 'STUDENT' | 'TEACHER' | 'ADMIN', classId?: string): Promise<{
         id: string;
         username: string;
         regNumber: string | null;

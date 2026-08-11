@@ -51,6 +51,10 @@ import {
   RealtimeModule,
 } from './realtime/realtime.module';
 
+import {
+  CbtModule,
+} from './cbt/cbt.module';
+
 @Module({
   imports: [
     /*
@@ -92,6 +96,7 @@ import {
     ChatbotModule,
     TeachersModule,
     NotificationsModule,
+    CbtModule,
 
     /*
      * ==========================================

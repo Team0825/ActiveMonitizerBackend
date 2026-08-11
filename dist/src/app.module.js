@@ -21,6 +21,7 @@ const chatbot_module_1 = require("./chatbot/chatbot.module");
 const teachers_module_1 = require("./teachers/teachers.module");
 const notification_module_1 = require("./notifications/notification.module");
 const realtime_module_1 = require("./realtime/realtime.module");
+const cbt_module_1 = require("./cbt/cbt.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -45,6 +46,7 @@ exports.AppModule = AppModule = __decorate([
             chatbot_module_1.ChatbotModule,
             teachers_module_1.TeachersModule,
             notification_module_1.NotificationsModule,
+            cbt_module_1.CbtModule,
             realtime_module_1.RealtimeModule,
         ],
         providers: [

@@ -34,7 +34,26 @@ export declare class AdminUsersController {
         createdAt: Date;
         updatedAt: Date;
     }>;
-    list(role?: 'STUDENT' | 'TEACHER', classId?: string): Promise<{
+    createAdmin(req: AuthenticatedRequest, dto: {
+        name?: string;
+        username: string;
+        password: string;
+        mobile?: string;
+        email?: string;
+    }): Promise<{
+        id: string;
+        username: string;
+        regNumber: string | null;
+        email: string | null;
+        role: string;
+        name: string | null;
+        mobile: string | null;
+        classId: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    list(role?: 'STUDENT' | 'TEACHER' | 'ADMIN', classId?: string): Promise<{
         id: string;
         username: string;
         regNumber: string | null;

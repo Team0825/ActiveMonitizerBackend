@@ -146,6 +146,42 @@ export class AdminUsersService {
 
   /**
    * =========================================================
+   * CREATE ADMIN
+   * =========================================================
+   */
+  async createAdmin(
+    adminId: string,
+    dto: { name?: string; username: string; password: string; mobile?: string; email?: string },
+  ) {
+    await this.assertUnique(
+      dto.username,
+      undefined,
+      dto.email,
+    );
+
+    const passwordHash =
+      await bcrypt.hash(
+        dto.password,
+        10,
+      );
+
+    return this.prisma.user.create({
+      data: {
+        role: 'ADMIN',
+        name: dto.name?.trim() || null,
+        username: dto.username.trim(),
+        passwordHash,
+        mobile: dto.mobile?.trim() || null,
+        email: dto.email?.trim() || null,
+        createdById: adminId,
+        isActive: true,
+      },
+      select: this.safeSelect(),
+    });
+  }
+
+  /**
+   * =========================================================
    * LIST USERS
    * =========================================================
    *
@@ -157,12 +193,13 @@ export class AdminUsersService {
    *
    * GET /admin/users?role=TEACHER
    *
-   * GET /admin/users?role=STUDENT&classId=CSE-1
+   * GET /admin/users?role=ADMIN
    */
   async listUsers(
     role?:
       | 'STUDENT'
-      | 'TEACHER',
+      | 'TEACHER'
+      | 'ADMIN',
     classId?: string,
   ) {
     return this.prisma.user.findMany({

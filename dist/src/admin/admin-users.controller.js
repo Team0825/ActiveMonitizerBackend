@@ -27,6 +27,9 @@ let AdminUsersController = class AdminUsersController {
     createTeacher(req, dto) {
         return this.usersService.createTeacher(req.user.sub, dto);
     }
+    createAdmin(req, dto) {
+        return this.usersService.createAdmin(req.user.sub, dto);
+    }
     list(role, classId) {
         return this.usersService.listUsers(role, classId);
     }
@@ -54,6 +57,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, users_dto_1.CreateTeacherDto]),
     __metadata("design:returntype", void 0)
 ], AdminUsersController.prototype, "createTeacher", null);
+__decorate([
+    (0, common_1.Post)('admins'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AdminUsersController.prototype, "createAdmin", null);
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('role')),

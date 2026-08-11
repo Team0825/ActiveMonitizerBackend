@@ -58,6 +58,23 @@ let AdminUsersService = class AdminUsersService {
             select: this.safeSelect(),
         });
     }
+    async createAdmin(adminId, dto) {
+        await this.assertUnique(dto.username, undefined, dto.email);
+        const passwordHash = await bcrypt.hash(dto.password, 10);
+        return this.prisma.user.create({
+            data: {
+                role: 'ADMIN',
+                name: dto.name?.trim() || null,
+                username: dto.username.trim(),
+                passwordHash,
+                mobile: dto.mobile?.trim() || null,
+                email: dto.email?.trim() || null,
+                createdById: adminId,
+                isActive: true,
+            },
+            select: this.safeSelect(),
+        });
+    }
     async listUsers(role, classId) {
         return this.prisma.user.findMany({
             where: {
