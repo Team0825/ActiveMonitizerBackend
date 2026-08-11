@@ -17,6 +17,7 @@ exports.PcsGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
+const crypto_1 = require("crypto");
 const socket_io_1 = require("socket.io");
 const prisma_service_1 = require("../prisma/prisma.service");
 const session_realtime_service_1 = require("../realtime/session-realtime.service");
@@ -82,6 +83,11 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         if (!hostname) {
             return;
         }
+        if (client.data.pcPresence) {
+            await this.pcsService
+                .markPresenceOffline(hostname);
+            return;
+        }
         const pc = await this.prisma.pc
             .findUnique({
             where: {
@@ -125,9 +131,24 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             .trim();
         client.data.hostname =
             hostname;
-        await this.pcsService.markOnline(hostname, payload.labName, payload.sessionId, client.data.user?.sub);
+        const registrationSessionId = typeof payload.sessionId ===
+            'string' &&
+            payload.sessionId.trim()
+            ? payload.sessionId.trim()
+            : user?.sessionId;
+        this.logger.log(`[TRACE-PC] Backend received pc:register sessionId=${payload.sessionId ?? 'NULL'}`);
+        this.logger.log(`[TRACE-PC] Backend JWT user=${JSON.stringify(user ?? null)}`);
+        this.logger.log(`[TRACE-PC] Backend resolved sessionId=${registrationSessionId ?? 'NULL'}`);
+        this.logger.log(`[PC-REGISTER] hostname=${hostname}`);
+        this.logger.log(`[PC-REGISTER] received sessionId=${payload.sessionId ?? 'NULL'}`);
+        this.logger.log(`[PC-REGISTER] studentId=${client.data.user?.sub ?? 'NULL'}`);
+        const registeredPc = await this.pcsService.markOnline(hostname, payload.labName, registrationSessionId, client.data.user?.sub);
+        this.logger.log(`[PC-REGISTER] resolved session UUID=${registeredPc.currentSessionId ?? 'NULL'}`);
+        this.logger.log(`[PC-REGISTER] database currentSessionId=${registeredPc.currentSessionId ?? 'NULL'}`);
+        this.logger.log(`[TRACE-PC] markOnline database currentSessionId=${registeredPc.currentSessionId ?? 'NULL'}`);
+        this.logger.log(`[PC-CONTROL] Agent registered hostname/session ${hostname} ${registrationSessionId ?? 'NO_SESSION'}`);
         await client.join(`pc:${hostname}`);
-        if (!payload.sessionId) {
+        if (!registrationSessionId) {
             client.emit('pc:registered', {
                 ok: true,
                 hostname,
@@ -136,7 +157,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             });
             return;
         }
-        const sessionIdentifier = payload.sessionId
+        const sessionIdentifier = registrationSessionId
             .trim();
         const session = await this.prisma
             .classSession
@@ -330,6 +351,258 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         }
     }
     async onTeacherSubscribe(client, payload) {
+        const user = client.data.user;
+        if (!user ||
+            (user.role !==
+                'TEACHER' &&
+                user.role !==
+                    'ADMIN')) {
+            client.emit('error', {
+                message: 'Only Teacher or Admin clients can subscribe to PC sessions.',
+            });
+            return;
+        }
+        if (!payload ||
+            typeof payload.sessionId !==
+                'string' ||
+            !payload.sessionId.trim()) {
+            client.emit('error', {
+                message: 'sessionId is required',
+            });
+            return;
+        }
+        this.logger.log(`[TRACE-PC] teacher subscribe requested sessionId=${payload.sessionId}`);
+        const session = await this.prisma
+            .classSession
+            .findFirst({
+            where: {
+                OR: [
+                    {
+                        id: payload.sessionId
+                            .trim(),
+                    },
+                    {
+                        sessionCode: payload.sessionId
+                            .trim()
+                            .toUpperCase(),
+                    },
+                ],
+            },
+        });
+        if (!session) {
+            client.emit('error', {
+                message: 'Session not found',
+            });
+            return;
+        }
+        const sessionRoom = `session:${session.id}`;
+        this.logger.log(`[TRACE-PC] teacher subscribe resolved session UUID=${session.id}`);
+        await client.join(sessionRoom);
+        this.logger.log(`[PC-CONTROL] Teacher subscribed session ${session.id}`);
+        const pcs = await this.pcsService
+            .listPcsForSession(session.id);
+        this.logger.log(`[PC-CONTROL] PCs found for session ${session.id}: ${pcs.length}`);
+        this.logger.log(`[TRACE-PC] PCs returned=${JSON.stringify(pcs.map(pc => ({
+            hostname: pc.hostname,
+            status: pc.status,
+            currentSessionId: pc.currentSessionId,
+            currentStudentId: pc.currentStudentId,
+        })))}`);
+        client.emit('teacher:subscribed', {
+            sessionId: session.id,
+            sessionCode: session.sessionCode,
+        });
+        client.emit('pc:list', pcs);
+        this.logger.log(`[PC-CONTROL] pc:list emitted count ${pcs.length}`);
+        this.logger.log(`[TRACE-PC] pc:list count=${pcs.length}`);
+    }
+    async onTeacherCommand(client, payload) {
+        const user = client.data.user;
+        if (!user ||
+            (user.role !==
+                'TEACHER' &&
+                user.role !==
+                    'ADMIN')) {
+            client.emit('error', {
+                message: 'Only Teacher or Admin clients can send PC commands.',
+            });
+            return;
+        }
+        try {
+            (0, pcs_dto_1.assertTeacherCommandPayload)(payload);
+        }
+        catch (error) {
+            client.emit('error', {
+                message: error
+                    instanceof Error
+                    ? error.message
+                    : 'Invalid PC command payload.',
+            });
+            return;
+        }
+        const sessionIdentifier = payload.sessionId
+            .trim();
+        const session = await this.prisma
+            .classSession
+            .findFirst({
+            where: {
+                OR: [
+                    {
+                        id: sessionIdentifier,
+                    },
+                    {
+                        sessionCode: sessionIdentifier
+                            .toUpperCase(),
+                    },
+                ],
+            },
+        });
+        if (!session) {
+            client.emit('error', {
+                message: 'Session not found',
+            });
+            return;
+        }
+        if (session.status !==
+            'ACTIVE') {
+            client.emit('error', {
+                message: 'Session is not active',
+            });
+            return;
+        }
+        const pcs = await this.pcsService
+            .listPcsForSession(session.id);
+        const targetHostname = payload.targetHostname
+            ?.trim() ||
+            'ALL';
+        const targetPcs = targetHostname ===
+            'ALL'
+            ? pcs
+            : pcs.filter(pc => pc.hostname ===
+                targetHostname);
+        if (targetPcs.length ===
+            0) {
+            client.emit('error', {
+                message: targetHostname ===
+                    'ALL'
+                    ? 'No connected PCs found for this session'
+                    : 'Target PC is not connected to this session',
+            });
+            return;
+        }
+        const issuedAt = new Date();
+        for (const pc of targetPcs) {
+            const commandId = (0, crypto_1.randomUUID)();
+            const command = {
+                commandId,
+                sessionId: session.id,
+                action: payload.action,
+                ...(payload.action ===
+                    'MESSAGE'
+                    ? {
+                        message: payload.message
+                            ?.trim(),
+                    }
+                    : {}),
+                issuedBy: user.sub,
+                issuedAt: issuedAt
+                    .toISOString(),
+            };
+            this.pendingCommands
+                .set(commandId, {
+                commandId,
+                sessionId: session.id,
+                issuedBy: user.sub,
+                issuedAt: issuedAt
+                    .getTime(),
+                targetHostname: pc.hostname,
+            });
+            this.server
+                .to(`pc:${pc.hostname}`)
+                .emit('command:execute', command);
+            this.server
+                .to(`session:${session.id}`)
+                .emit('command:sent', {
+                commandId,
+                sessionId: session.id,
+                sessionCode: session.sessionCode,
+                targetHostname: pc.hostname,
+                requestedTargetHostname: targetHostname,
+                action: payload.action,
+                issuedBy: user.sub,
+                issuedAt: command.issuedAt,
+            });
+            await this.pcsService
+                .logCommand(user.sub, payload.action, pc.hostname, {
+                commandId,
+                sessionId: session.id,
+                targetHostname: pc.hostname,
+                requestedTargetHostname: targetHostname,
+            });
+        }
+    }
+    async onCommandAck(client, payload) {
+        try {
+            (0, pcs_dto_1.assertPcCommandAckPayload)(payload);
+        }
+        catch (error) {
+            client.emit('error', {
+                message: error
+                    instanceof Error
+                    ? error.message
+                    : 'Invalid command acknowledgement payload.',
+            });
+            return;
+        }
+        const pending = this.pendingCommands
+            .get(payload.commandId);
+        if (!pending) {
+            return;
+        }
+        if (pending.targetHostname !==
+            'ALL' &&
+            pending.targetHostname !==
+                payload.hostname) {
+            client.emit('error', {
+                message: 'Command acknowledgement hostname does not match the pending command.',
+            });
+            return;
+        }
+        const latencyMs = Date.now() -
+            pending.issuedAt;
+        const result = {
+            ...payload,
+            latencyMs,
+        };
+        this.server
+            .to(`session:${pending.sessionId}`)
+            .emit('command:result', result);
+        if (payload.success) {
+            const nextStatus = payload.action ===
+                'LOCK'
+                ? 'LOCKED'
+                : payload.action ===
+                    'FREEZE'
+                    ? 'FROZEN'
+                    : (payload.action ===
+                        'UNLOCK' ||
+                        payload.action ===
+                            'UNFREEZE')
+                        ? 'ONLINE'
+                        : null;
+            if (nextStatus) {
+                await this.pcsService
+                    .setStatus(payload.hostname, nextStatus);
+                this.server
+                    .to(`session:${pending.sessionId}`)
+                    .emit('pc:status-update', {
+                    hostname: payload.hostname,
+                    status: nextStatus,
+                });
+            }
+        }
+        this.pendingCommands
+            .delete(payload.commandId);
     }
     async handleSystemInfo(client, payload) {
         await this.pcsService.updateSystemInfo(payload.hostname, payload);
@@ -372,6 +645,22 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], PcsGateway.prototype, "onTeacherSubscribe", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('teacher:command'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onTeacherCommand", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('command:ack'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onCommandAck", null);
 __decorate([
     (0, websockets_1.SubscribeMessage)("pc:system-info"),
     __metadata("design:type", Function),

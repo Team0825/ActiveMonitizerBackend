@@ -72,6 +72,7 @@ export declare class PcsService {
         lastSyncAt: Date | null;
         registeredAt: Date;
     } | null>;
+    markPresenceOffline(hostname: string): Promise<import(".prisma/client").Prisma.BatchPayload | null>;
     touchHeartbeat(hostname: string): Promise<{
         id: string;
         updatedAt: Date;

@@ -33,12 +33,16 @@ export class PcsService {
 
     let internalSessionId: string | null = null;
 
+    const hasSession =
+      typeof sessionId === 'string' &&
+      !!sessionId.trim();
+
     /*
      * Resolve Session Code / UUID
      * into the internal database Session UUID.
      */
 
-    if (sessionId) {
+    if (hasSession) {
       const sessionIdentifier = sessionId.trim();
 
       const session =
@@ -104,10 +108,14 @@ export class PcsService {
           labName ?? undefined,
 
         currentSessionId:
-          internalSessionId,
+          hasSession
+            ? internalSessionId
+            : undefined,
 
         currentStudentId:
-          studentId ?? null,
+          hasSession
+            ? studentId ?? null
+            : undefined,
 
         lastSeen:
           new Date(),
@@ -150,6 +158,30 @@ export class PcsService {
 
           currentStudentId:
             null,
+        },
+      })
+      .catch(() => null);
+  }
+
+  async markPresenceOffline(
+    hostname: string,
+  ) {
+    const normalizedHostname =
+      hostname.trim();
+
+    return this.prisma.pc
+      .updateMany({
+        where: {
+          hostname:
+            normalizedHostname,
+
+          currentSessionId:
+            null,
+        },
+
+        data: {
+          status:
+            'OFFLINE',
         },
       })
       .catch(() => null);
@@ -285,15 +317,63 @@ export class PcsService {
       return [];
     }
 
-    /*
-     * PC.currentSessionId always stores
-     * the internal Session UUID.
-     */
+    const participants =
+      await this.prisma
+        .sessionParticipant
+        .findMany({
+          where: {
+            sessionId:
+              session.id,
+
+            pcHostname: {
+              not:
+                null,
+            },
+          },
+
+          select: {
+            pcHostname:
+              true,
+          },
+        });
+
+    const participantHostnames =
+      participants
+        .map(
+          participant =>
+            participant.pcHostname
+              ?.trim(),
+        )
+        .filter(
+          (
+            hostname,
+          ): hostname is string =>
+            !!hostname,
+        );
 
     return this.prisma.pc.findMany({
       where: {
-        currentSessionId:
-          session.id,
+        status:
+          'ONLINE',
+
+        OR: [
+          {
+            currentSessionId:
+              session.id,
+          },
+
+          {
+            hostname: {
+              in:
+                participantHostnames,
+            },
+          },
+        ],
+      },
+
+      orderBy: {
+        hostname:
+          'asc',
       },
     });
   }
@@ -645,6 +725,26 @@ async updateSystemInfo(
     hostname: string,
     info: PcSystemInfoPayload
 ) {
+    const healthStatus =
+    (
+        info.cpuUsage > 90 ||
+        info.ramUsagePercent > 90 ||
+        info.diskUsagePercent > 95
+    )
+        ? "CRITICAL"
+        : (
+            info.cpuUsage >= 80 ||
+            info.ramUsagePercent >= 80 ||
+            info.diskUsagePercent >= 90
+        )
+            ? "WARNING"
+            : "GOOD";
+
+    const internetStatus =
+        info.internetConnected
+            ? "ONLINE"
+            : "OFFLINE";
+
     const pc = await this.prisma.pc.update({
 
         where: {
@@ -669,6 +769,12 @@ async updateSystemInfo(
             totalDiskMb: info.totalDiskGb * 1024,
 
             availableDiskMb: info.freeDiskGb * 1024,
+
+            healthStatus,
+
+            internetStatus,
+
+            lastHealthCheck: new Date(),
 
             lastSyncAt: new Date()
         }
@@ -744,25 +850,9 @@ antivirusEnabled: info.antivirusEnabled,
 availableDiskMb:
     info.freeDiskGb * 1024,
 
-healthStatus:
-    (
-        info.cpuUsage > 90 ||
-        info.ramUsagePercent > 90 ||
-        info.diskUsagePercent > 95
-    )
-        ? "CRITICAL"
-        : (
-            info.cpuUsage >= 80 ||
-            info.ramUsagePercent >= 80 ||
-            info.diskUsagePercent >= 90
-        )
-            ? "WARNING"
-            : "GOOD",
+healthStatus,
 
-            internetStatus:
-                info.internetConnected
-                    ? "ONLINE"
-                    : "OFFLINE",
+            internetStatus,
 
             lastSystemReport:
                 new Date()

@@ -5,13 +5,15 @@ import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRealtimeService } from '../realtime/session-realtime.service';
 import { PcsService } from './pcs.service';
-import { HeartbeatPayload, RegisterPcPayload, TeacherSubscribePayload, PcActivityPayload } from './dto/pcs.dto';
+import { HeartbeatPayload, RegisterPcPayload, TeacherCommandPayload, TeacherSubscribePayload, PcCommandAckPayload, PcActivityPayload } from './dto/pcs.dto';
 interface AuthedSocket extends Socket {
     data: {
         user?: {
             sub: string;
             role: 'STUDENT' | 'TEACHER' | 'ADMIN';
             username: string;
+            sessionId?: string;
+            sessionCode?: string;
         };
         hostname?: string;
         pcPresence?: boolean;
@@ -33,6 +35,8 @@ export declare class PcsGateway implements OnGatewayInit, OnGatewayConnection, O
     onHeartbeat(payload: HeartbeatPayload): Promise<void>;
     onPcActivity(client: AuthedSocket, payload: PcActivityPayload): Promise<void>;
     onTeacherSubscribe(client: AuthedSocket, payload: TeacherSubscribePayload): Promise<void>;
+    onTeacherCommand(client: AuthedSocket, payload: TeacherCommandPayload): Promise<void>;
+    onCommandAck(client: AuthedSocket, payload: PcCommandAckPayload): Promise<void>;
     handleSystemInfo(client: Socket, payload: PcSystemInfoPayload): Promise<void>;
 }
 export {};

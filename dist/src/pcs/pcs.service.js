@@ -19,7 +19,9 @@ let PcsService = class PcsService {
     async markOnline(hostname, labName, sessionId, studentId) {
         const normalizedHostname = hostname.trim();
         let internalSessionId = null;
-        if (sessionId) {
+        const hasSession = typeof sessionId === 'string' &&
+            !!sessionId.trim();
+        if (hasSession) {
             const sessionIdentifier = sessionId.trim();
             const session = await this.prisma.classSession.findFirst({
                 where: {
@@ -55,8 +57,12 @@ let PcsService = class PcsService {
             update: {
                 status: 'ONLINE',
                 labName: labName ?? undefined,
-                currentSessionId: internalSessionId,
-                currentStudentId: studentId ?? null,
+                currentSessionId: hasSession
+                    ? internalSessionId
+                    : undefined,
+                currentStudentId: hasSession
+                    ? studentId ?? null
+                    : undefined,
                 lastSeen: new Date(),
             },
         });
@@ -72,6 +78,20 @@ let PcsService = class PcsService {
                 status: 'OFFLINE',
                 currentSessionId: null,
                 currentStudentId: null,
+            },
+        })
+            .catch(() => null);
+    }
+    async markPresenceOffline(hostname) {
+        const normalizedHostname = hostname.trim();
+        return this.prisma.pc
+            .updateMany({
+            where: {
+                hostname: normalizedHostname,
+                currentSessionId: null,
+            },
+            data: {
+                status: 'OFFLINE',
             },
         })
             .catch(() => null);
@@ -123,9 +143,39 @@ let PcsService = class PcsService {
         if (!session) {
             return [];
         }
+        const participants = await this.prisma
+            .sessionParticipant
+            .findMany({
+            where: {
+                sessionId: session.id,
+                pcHostname: {
+                    not: null,
+                },
+            },
+            select: {
+                pcHostname: true,
+            },
+        });
+        const participantHostnames = participants
+            .map(participant => participant.pcHostname
+            ?.trim())
+            .filter((hostname) => !!hostname);
         return this.prisma.pc.findMany({
             where: {
-                currentSessionId: session.id,
+                status: 'ONLINE',
+                OR: [
+                    {
+                        currentSessionId: session.id,
+                    },
+                    {
+                        hostname: {
+                            in: participantHostnames,
+                        },
+                    },
+                ],
+            },
+            orderBy: {
+                hostname: 'asc',
             },
         });
     }
@@ -242,6 +292,18 @@ let PcsService = class PcsService {
         };
     }
     async updateSystemInfo(hostname, info) {
+        const healthStatus = (info.cpuUsage > 90 ||
+            info.ramUsagePercent > 90 ||
+            info.diskUsagePercent > 95)
+            ? "CRITICAL"
+            : (info.cpuUsage >= 80 ||
+                info.ramUsagePercent >= 80 ||
+                info.diskUsagePercent >= 90)
+                ? "WARNING"
+                : "GOOD";
+        const internetStatus = info.internetConnected
+            ? "ONLINE"
+            : "OFFLINE";
         const pc = await this.prisma.pc.update({
             where: {
                 hostname
@@ -256,6 +318,9 @@ let PcsService = class PcsService {
                 availableMemoryMb: info.freeMemoryMb,
                 totalDiskMb: info.totalDiskGb * 1024,
                 availableDiskMb: info.freeDiskGb * 1024,
+                healthStatus,
+                internetStatus,
+                lastHealthCheck: new Date(),
                 lastSyncAt: new Date()
             }
         });
@@ -287,18 +352,8 @@ let PcsService = class PcsService {
                 diskUsagePercent: info.diskUsagePercent,
                 availableMemoryMb: info.freeMemoryMb,
                 availableDiskMb: info.freeDiskGb * 1024,
-                healthStatus: (info.cpuUsage > 90 ||
-                    info.ramUsagePercent > 90 ||
-                    info.diskUsagePercent > 95)
-                    ? "CRITICAL"
-                    : (info.cpuUsage >= 80 ||
-                        info.ramUsagePercent >= 80 ||
-                        info.diskUsagePercent >= 90)
-                        ? "WARNING"
-                        : "GOOD",
-                internetStatus: info.internetConnected
-                    ? "ONLINE"
-                    : "OFFLINE",
+                healthStatus,
+                internetStatus,
                 lastSystemReport: new Date()
             }
         });

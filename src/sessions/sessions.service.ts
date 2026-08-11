@@ -815,6 +815,33 @@ export class SessionsService {
           },
         });
 
+    if (
+      dto.pcHostname?.trim()
+    ) {
+      await this.prisma.pc
+        .updateMany({
+          where: {
+            hostname:
+              dto.pcHostname
+                .trim(),
+          },
+
+          data: {
+            status:
+              'ONLINE',
+
+            currentSessionId:
+              session.id,
+
+            currentStudentId:
+              studentId,
+
+            lastSeen:
+              new Date(),
+          },
+        });
+    }
+
     /*
      * ----------------------------------------
      * ATTENDANCE
