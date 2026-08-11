@@ -38,5 +38,12 @@ export declare class PcsGateway implements OnGatewayInit, OnGatewayConnection, O
     onTeacherCommand(client: AuthedSocket, payload: TeacherCommandPayload): Promise<void>;
     onCommandAck(client: AuthedSocket, payload: PcCommandAckPayload): Promise<void>;
     handleSystemInfo(client: Socket, payload: PcSystemInfoPayload): Promise<void>;
+    onPcViolation(_client: Socket, payload: {
+        hostname: string;
+        sessionId: string;
+        type: string;
+        details: string;
+        occurredAt?: string;
+    }): Promise<void>;
 }
 export {};

@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { PcsService } from './pcs.service';
 
 @Controller('pcs')
@@ -10,5 +10,10 @@ export class PcsController {
   @Get('health')
   async getHealth() {
     return this.pcsService.getHealth();
+  }
+
+  @Get('violations')
+  async getViolations(@Query('sessionId') sessionId?: string) {
+    return this.pcsService.getViolations(sessionId);
   }
 }

@@ -592,6 +592,17 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         await this.pcsService.updateSystemInfo(payload.hostname, payload);
         this.server.emit("pc:system-info", payload);
     }
+    async onPcViolation(_client, payload) {
+        if (!payload || !payload.hostname || !payload.sessionId) {
+            return;
+        }
+        const recorded = await this.pcsService.logViolation(payload.hostname, payload.sessionId, payload.type, payload.details, payload.occurredAt);
+        this.server
+            .to(`session:${recorded.sessionId}`)
+            .emit('pc:violation', recorded);
+        this.server.emit('pc:violation', recorded);
+        this.logger.warn(`[VIOLATION] ${payload.type} on PC ${payload.hostname} in Session ${payload.sessionId}: ${payload.details}`);
+    }
 };
 exports.PcsGateway = PcsGateway;
 __decorate([
@@ -651,6 +662,14 @@ __decorate([
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", Promise)
 ], PcsGateway.prototype, "handleSystemInfo", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('pc:violation'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onPcViolation", null);
 exports.PcsGateway = PcsGateway = PcsGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         namespace: '/realtime',

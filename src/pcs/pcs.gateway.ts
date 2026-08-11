@@ -1524,4 +1524,46 @@ async handleSystemInfo(
 
 }  
 
+  /*
+   * ==========================================================
+   * PC VIOLATION
+   * ==========================================================
+   */
+
+  @SubscribeMessage('pc:violation')
+  async onPcViolation(
+    @ConnectedSocket() _client: Socket,
+    @MessageBody()
+    payload: {
+      hostname: string;
+      sessionId: string;
+      type: string;
+      details: string;
+      occurredAt?: string;
+    },
+  ) {
+    if (!payload || !payload.hostname || !payload.sessionId) {
+      return;
+    }
+
+    const recorded = await this.pcsService.logViolation(
+      payload.hostname,
+      payload.sessionId,
+      payload.type,
+      payload.details,
+      payload.occurredAt,
+    );
+
+    this.server
+      .to(`session:${recorded.sessionId}`)
+      .emit('pc:violation', recorded);
+
+    this.server.emit('pc:violation', recorded);
+
+    this.logger.warn(
+      `[VIOLATION] ${payload.type} on PC ${payload.hostname} in Session ${payload.sessionId}: ${payload.details}`,
+    );
+  }
+
 }
+

@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PcsService = void 0;
 const common_1 = require("@nestjs/common");
+const crypto_1 = require("crypto");
 const prisma_service_1 = require("../prisma/prisma.service");
 let PcsService = class PcsService {
     constructor(prisma) {
@@ -504,6 +505,95 @@ let PcsService = class PcsService {
                 updatedAt: pc.updatedAt,
             };
         });
+    }
+    async logViolation(hostname, sessionId, type, details, occurredAt) {
+        const session = await this.prisma.classSession.findFirst({
+            where: {
+                OR: [
+                    { id: sessionId.trim() },
+                    { sessionCode: sessionId.trim().toUpperCase() },
+                ],
+            },
+            select: { id: true, sessionCode: true, classTitle: true },
+        });
+        const pc = await this.prisma.pc.findUnique({
+            where: { hostname: hostname.trim() },
+            select: { currentStudentId: true, displayName: true, labName: true },
+        });
+        let student = null;
+        if (pc?.currentStudentId) {
+            const studentRecord = await this.prisma.user.findUnique({
+                where: { id: pc.currentStudentId },
+                select: { id: true, name: true, username: true, regNumber: true, rollNumber: true },
+            });
+            if (studentRecord) {
+                student = {
+                    id: studentRecord.id,
+                    name: studentRecord.name || studentRecord.username,
+                    regNumber: studentRecord.regNumber || studentRecord.rollNumber,
+                };
+            }
+        }
+        const payload = {
+            id: (0, crypto_1.randomUUID)(),
+            hostname: hostname.trim(),
+            sessionId: session?.id ?? sessionId,
+            sessionCode: session?.sessionCode ?? sessionId,
+            classTitle: session?.classTitle ?? 'Session',
+            type: type || 'AGENT_TAMPER',
+            details: details || 'Violation detected',
+            student,
+            occurredAt: occurredAt || new Date().toISOString(),
+            status: 'UNRESOLVED',
+            severity: (type === 'AGENT_STOPPED' || type === 'AGENT_TAMPER' || type === 'RESTRICTION_BYPASS') ? 'CRITICAL' : 'WARNING',
+        };
+        await this.prisma.auditLog.create({
+            data: {
+                actorId: pc?.currentStudentId || 'AGENT',
+                action: 'VIOLATION',
+                targetPc: hostname.trim(),
+                metadata: JSON.stringify(payload),
+            },
+        });
+        return payload;
+    }
+    async getViolations(sessionId) {
+        const logs = await this.prisma.auditLog.findMany({
+            where: {
+                action: 'VIOLATION',
+            },
+            orderBy: {
+                createdAt: 'desc',
+            },
+            take: 100,
+        });
+        const violations = logs.map((log) => {
+            try {
+                if (log.metadata) {
+                    const parsed = JSON.parse(log.metadata);
+                    return {
+                        id: log.id,
+                        ...parsed,
+                        createdAt: log.createdAt,
+                    };
+                }
+            }
+            catch {
+            }
+            return {
+                id: log.id,
+                hostname: log.targetPc || 'Unknown PC',
+                type: 'AGENT_TAMPER',
+                details: log.metadata || 'Violation detected',
+                occurredAt: log.createdAt.toISOString(),
+                status: 'UNRESOLVED',
+                severity: 'WARNING',
+            };
+        });
+        if (sessionId) {
+            return violations.filter((v) => v.sessionId === sessionId || v.sessionCode === sessionId);
+        }
+        return violations;
     }
 };
 exports.PcsService = PcsService;

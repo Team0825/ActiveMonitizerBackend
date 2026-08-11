@@ -292,4 +292,22 @@ export declare class PcsService {
         registeredAt: Date;
         updatedAt: Date;
     }[]>;
+    logViolation(hostname: string, sessionId: string, type: string, details: string, occurredAt?: string): Promise<{
+        id: `${string}-${string}-${string}-${string}-${string}`;
+        hostname: string;
+        sessionId: string;
+        sessionCode: string;
+        classTitle: string;
+        type: string;
+        details: string;
+        student: {
+            id: string;
+            name: string;
+            regNumber?: string | null;
+        } | null;
+        occurredAt: string;
+        status: string;
+        severity: string;
+    }>;
+    getViolations(sessionId?: string): Promise<any[]>;
 }

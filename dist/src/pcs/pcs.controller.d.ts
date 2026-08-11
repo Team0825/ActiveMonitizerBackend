@@ -63,4 +63,5 @@ export declare class PcsController {
         registeredAt: Date;
         updatedAt: Date;
     }[]>;
+    getViolations(sessionId?: string): Promise<any[]>;
 }
