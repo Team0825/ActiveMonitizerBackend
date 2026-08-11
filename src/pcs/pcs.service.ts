@@ -745,117 +745,76 @@ async updateSystemInfo(
             ? "ONLINE"
             : "OFFLINE";
 
-    const pc = await this.prisma.pc.update({
-
+    const pc = await this.prisma.pc.upsert({
         where: {
             hostname
         },
-
-        data: {
+        create: {
+            hostname,
             agentVersion: info.agentVersion,
-
             cpuName: info.processorName,
-
             osName: info.osName,
-
             osVersion: info.osVersion,
-
             osArchitecture: info.osArchitecture,
-
             totalMemoryMb: info.totalMemoryMb,
-
             availableMemoryMb: info.freeMemoryMb,
-
             totalDiskMb: info.totalDiskGb * 1024,
-
             availableDiskMb: info.freeDiskGb * 1024,
-
             healthStatus,
-
             internetStatus,
-
+            status: 'ONLINE',
+            lastSeen: new Date(),
             lastHealthCheck: new Date(),
-
+            lastSyncAt: new Date()
+        },
+        update: {
+            agentVersion: info.agentVersion,
+            cpuName: info.processorName,
+            osName: info.osName,
+            osVersion: info.osVersion,
+            osArchitecture: info.osArchitecture,
+            totalMemoryMb: info.totalMemoryMb,
+            availableMemoryMb: info.freeMemoryMb,
+            totalDiskMb: info.totalDiskGb * 1024,
+            availableDiskMb: info.freeDiskGb * 1024,
+            healthStatus,
+            internetStatus,
+            lastHealthCheck: new Date(),
             lastSyncAt: new Date()
         }
     });
 
     await this.prisma.pcHealthReport.create({
-
         data: {
-
-          gpuName: info.gpuName,
-
-gpuDriverVersion: info.gpuDriverVersion,
-
-uptimeSeconds: info.uptimeSeconds,
-
-restartRequired: info.restartRequired,
-
-firewallEnabled: info.firewallEnabled,
-
-antivirusEnabled: info.antivirusEnabled,
+            gpuName: info.gpuName,
+            gpuDriverVersion: info.gpuDriverVersion,
+            uptimeSeconds: info.uptimeSeconds,
+            restartRequired: info.restartRequired,
+            firewallEnabled: info.firewallEnabled,
+            antivirusEnabled: info.antivirusEnabled,
             pcId: pc.id,
-
             agentVersion: info.agentVersion,
-
             osName: info.osName,
-
             osVersion: info.osVersion,
-
             osArchitecture: info.osArchitecture,
-
-            processArchitecture:
-                info.processArchitecture,
-
-            processorCount:
-                info.processorCount,
-
-            dotNetVersion:
-                info.dotNetVersion,
-
-            ramUsage:
-                info.ramUsage,
-
-            totalMemoryMb:
-                info.totalMemoryMb,
-
-            freeMemoryMb:
-                info.freeMemoryMb,
-
-            diskUsage:
-                info.diskUsage,
-
-            totalDiskGb:
-                info.totalDiskGb,
-
-            freeDiskGb:
-                info.freeDiskGb,
-
-            internetConnected:
-                info.internetConnected,
-
-            cpuUsagePercent:
-                info.cpuUsage,
-
-            memoryUsagePercent:
-                info.ramUsagePercent,
-
-            diskUsagePercent:
-                info.diskUsagePercent,
-
-            availableMemoryMb:
-    info.freeMemoryMb,
-
-availableDiskMb:
-    info.freeDiskGb * 1024,
-
-healthStatus,
-
+            processArchitecture: info.processArchitecture,
+            processorCount: info.processorCount,
+            dotNetVersion: info.dotNetVersion,
+            ramUsage: info.ramUsage,
+            totalMemoryMb: info.totalMemoryMb,
+            freeMemoryMb: info.freeMemoryMb,
+            diskUsage: info.diskUsage,
+            totalDiskGb: info.totalDiskGb,
+            freeDiskGb: info.freeDiskGb,
+            internetConnected: info.internetConnected,
+            cpuUsagePercent: info.cpuUsage,
+            memoryUsagePercent: info.ramUsagePercent,
+            diskUsagePercent: info.diskUsagePercent,
+            availableMemoryMb: info.freeMemoryMb,
+            availableDiskMb: info.freeDiskGb * 1024,
+            healthStatus,
             internetStatus,
-
-            lastSystemReport:
-                new Date()
+            lastSystemReport: new Date()
         }
     });
 
@@ -865,46 +824,39 @@ healthStatus,
 async getHealth() {
   /*
    * ============================================================
-   * LIVE PC HEALTH
+   * LIVE PC HEALTH & HISTORICAL SNAPSHOTS
    * ============================================================
    *
-   * Only PCs that have sent a heartbeat recently are returned.
-   *
-   * Old database records are NOT shown in Live Health.
+   * PCs that have sent a recent heartbeat (<= 15s) are marked ONLINE.
+   * Older database records are retained as OFFLINE with historical data.
    */
 
   const LIVE_HEARTBEAT_SECONDS = 15;
-
-  const liveSince = new Date(
-    Date.now() -
-      LIVE_HEARTBEAT_SECONDS * 1000,
-  );
+  const now = Date.now();
 
   const pcs = await this.prisma.pc.findMany({
-    where: {
-      status: 'ONLINE',
-
-      lastSeen: {
-        gte: liveSince,
-      },
-    },
-
     orderBy: {
       hostname: 'asc',
     },
-
     include: {
       healthReports: {
         orderBy: {
           reportedAt: 'desc',
         },
-
         take: 1,
       },
     },
   });
+
   return pcs.map(pc => {
     const health = pc.healthReports[0] ?? null;
+
+    const isLive =
+      pc.status === 'ONLINE' &&
+      pc.lastSeen != null &&
+      now - pc.lastSeen.getTime() <= LIVE_HEARTBEAT_SECONDS * 1000;
+
+    const effectiveStatus = isLive ? pc.status : 'OFFLINE';
 
     return {
       // ============================================================
@@ -915,16 +867,16 @@ async getHealth() {
       displayName: pc.displayName,
       labName: pc.labName,
 
-      status: pc.status,
+      status: effectiveStatus,
 
-      online: pc.status === 'ONLINE',
+      online: isLive,
 
       lastSeen: pc.lastSeen,
 
       heartbeatAgeSeconds:
         pc.lastSeen
           ? Math.floor(
-              (Date.now() - pc.lastSeen.getTime()) / 1000,
+              (now - pc.lastSeen.getTime()) / 1000,
             )
           : null,
 
@@ -940,9 +892,9 @@ async getHealth() {
       // ============================================================
 
       os: {
-        name: pc.osName,
-        version: pc.osVersion,
-        architecture: pc.osArchitecture,
+        name: health?.osName ?? pc.osName,
+        version: health?.osVersion ?? pc.osVersion,
+        architecture: health?.osArchitecture ?? pc.osArchitecture,
       },
 
       // ============================================================
@@ -959,7 +911,7 @@ async getHealth() {
           health?.processorCount ?? null,
       },
 
-            // ============================================================
+      // ============================================================
       // GPU
       // ============================================================
 
@@ -1008,30 +960,30 @@ async getHealth() {
       // ============================================================
 
       disk: {
-  totalMb:
-    health?.totalDiskGb != null
-      ? health.totalDiskGb * 1024
-      : pc.totalDiskMb,
+        totalMb:
+          health?.totalDiskGb != null
+            ? health.totalDiskGb * 1024
+            : pc.totalDiskMb,
 
-  availableMb:
-    health?.freeDiskGb != null
-      ? health.freeDiskGb * 1024
-      : pc.availableDiskMb,
+        availableMb:
+          health?.freeDiskGb != null
+            ? health.freeDiskGb * 1024
+            : pc.availableDiskMb,
 
-  usedMb:
-    health?.totalDiskGb != null &&
-    health?.freeDiskGb != null
-      ? (health.totalDiskGb * 1024) -
-        (health.freeDiskGb * 1024)
-      : pc.totalDiskMb != null &&
-        pc.availableDiskMb != null
-        ? pc.totalDiskMb -
-          pc.availableDiskMb
-        : null,
+        usedMb:
+          health?.totalDiskGb != null &&
+          health?.freeDiskGb != null
+            ? (health.totalDiskGb * 1024) -
+              (health.freeDiskGb * 1024)
+            : pc.totalDiskMb != null &&
+              pc.availableDiskMb != null
+              ? pc.totalDiskMb -
+                pc.availableDiskMb
+              : null,
 
-  usagePercent:
-    health?.diskUsagePercent ?? null,
-},
+        usagePercent:
+          health?.diskUsagePercent ?? null,
+      },
 
       // ============================================================
       // AGENT
@@ -1052,7 +1004,7 @@ async getHealth() {
           health?.processArchitecture ?? null,
       },
 
-            // ============================================================
+      // ============================================================
       // SYSTEM
       // ============================================================
 
@@ -1118,7 +1070,10 @@ async getHealth() {
         pc.lastHealthCheck,
 
       lastSystemReport:
-        health?.lastSystemReport ?? null,
+        health?.reportedAt ??
+        health?.lastSystemReport ??
+        pc.lastHealthCheck ??
+        null,
 
       lastSyncAt:
         pc.lastSyncAt,

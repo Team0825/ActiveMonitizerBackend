@@ -304,11 +304,29 @@ let PcsService = class PcsService {
         const internetStatus = info.internetConnected
             ? "ONLINE"
             : "OFFLINE";
-        const pc = await this.prisma.pc.update({
+        const pc = await this.prisma.pc.upsert({
             where: {
                 hostname
             },
-            data: {
+            create: {
+                hostname,
+                agentVersion: info.agentVersion,
+                cpuName: info.processorName,
+                osName: info.osName,
+                osVersion: info.osVersion,
+                osArchitecture: info.osArchitecture,
+                totalMemoryMb: info.totalMemoryMb,
+                availableMemoryMb: info.freeMemoryMb,
+                totalDiskMb: info.totalDiskGb * 1024,
+                availableDiskMb: info.freeDiskGb * 1024,
+                healthStatus,
+                internetStatus,
+                status: 'ONLINE',
+                lastSeen: new Date(),
+                lastHealthCheck: new Date(),
+                lastSyncAt: new Date()
+            },
+            update: {
                 agentVersion: info.agentVersion,
                 cpuName: info.processorName,
                 osName: info.osName,
@@ -361,15 +379,8 @@ let PcsService = class PcsService {
     }
     async getHealth() {
         const LIVE_HEARTBEAT_SECONDS = 15;
-        const liveSince = new Date(Date.now() -
-            LIVE_HEARTBEAT_SECONDS * 1000);
+        const now = Date.now();
         const pcs = await this.prisma.pc.findMany({
-            where: {
-                status: 'ONLINE',
-                lastSeen: {
-                    gte: liveSince,
-                },
-            },
             orderBy: {
                 hostname: 'asc',
             },
@@ -384,22 +395,26 @@ let PcsService = class PcsService {
         });
         return pcs.map(pc => {
             const health = pc.healthReports[0] ?? null;
+            const isLive = pc.status === 'ONLINE' &&
+                pc.lastSeen != null &&
+                now - pc.lastSeen.getTime() <= LIVE_HEARTBEAT_SECONDS * 1000;
+            const effectiveStatus = isLive ? pc.status : 'OFFLINE';
             return {
                 hostname: pc.hostname,
                 displayName: pc.displayName,
                 labName: pc.labName,
-                status: pc.status,
-                online: pc.status === 'ONLINE',
+                status: effectiveStatus,
+                online: isLive,
                 lastSeen: pc.lastSeen,
                 heartbeatAgeSeconds: pc.lastSeen
-                    ? Math.floor((Date.now() - pc.lastSeen.getTime()) / 1000)
+                    ? Math.floor((now - pc.lastSeen.getTime()) / 1000)
                     : null,
                 sessionId: pc.currentSessionId,
                 studentId: pc.currentStudentId,
                 os: {
-                    name: pc.osName,
-                    version: pc.osVersion,
-                    architecture: pc.osArchitecture,
+                    name: health?.osName ?? pc.osName,
+                    version: health?.osVersion ?? pc.osVersion,
+                    architecture: health?.osArchitecture ?? pc.osArchitecture,
                 },
                 cpu: {
                     name: pc.cpuName,
@@ -480,7 +495,10 @@ let PcsService = class PcsService {
                 latencyMs: health?.latencyMs ??
                     pc.latencyMs,
                 lastHealthCheck: pc.lastHealthCheck,
-                lastSystemReport: health?.lastSystemReport ?? null,
+                lastSystemReport: health?.reportedAt ??
+                    health?.lastSystemReport ??
+                    pc.lastHealthCheck ??
+                    null,
                 lastSyncAt: pc.lastSyncAt,
                 registeredAt: pc.registeredAt,
                 updatedAt: pc.updatedAt,

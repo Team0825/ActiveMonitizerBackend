@@ -1,4 +1,4 @@
-export type PcCommandAction = 'LOCK' | 'UNLOCK' | 'FREEZE' | 'UNFREEZE' | 'SHUTDOWN' | 'MESSAGE';
+export type PcCommandAction = 'LOCK' | 'UNLOCK' | 'FREEZE' | 'UNFREEZE' | 'SHUTDOWN' | 'MESSAGE' | 'CAPTURE';
 export interface RegisterPcPayload {
     hostname: string;
     labName?: string;
@@ -32,6 +32,7 @@ export interface PcCommandAckPayload {
     action: PcCommandAction;
     executedAt: string;
     error?: string;
+    imageUrl?: string;
 }
 export interface PcCommandResultPayload extends PcCommandAckPayload {
     latencyMs?: number;

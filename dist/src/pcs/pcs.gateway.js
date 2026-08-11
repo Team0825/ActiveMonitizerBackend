@@ -136,16 +136,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             payload.sessionId.trim()
             ? payload.sessionId.trim()
             : user?.sessionId;
-        this.logger.log(`[TRACE-PC] Backend received pc:register sessionId=${payload.sessionId ?? 'NULL'}`);
-        this.logger.log(`[TRACE-PC] Backend JWT user=${JSON.stringify(user ?? null)}`);
-        this.logger.log(`[TRACE-PC] Backend resolved sessionId=${registrationSessionId ?? 'NULL'}`);
-        this.logger.log(`[PC-REGISTER] hostname=${hostname}`);
-        this.logger.log(`[PC-REGISTER] received sessionId=${payload.sessionId ?? 'NULL'}`);
-        this.logger.log(`[PC-REGISTER] studentId=${client.data.user?.sub ?? 'NULL'}`);
-        const registeredPc = await this.pcsService.markOnline(hostname, payload.labName, registrationSessionId, client.data.user?.sub);
-        this.logger.log(`[PC-REGISTER] resolved session UUID=${registeredPc.currentSessionId ?? 'NULL'}`);
-        this.logger.log(`[PC-REGISTER] database currentSessionId=${registeredPc.currentSessionId ?? 'NULL'}`);
-        this.logger.log(`[TRACE-PC] markOnline database currentSessionId=${registeredPc.currentSessionId ?? 'NULL'}`);
+        await this.pcsService.markOnline(hostname, payload.labName, registrationSessionId, client.data.user?.sub);
         this.logger.log(`[PC-CONTROL] Agent registered hostname/session ${hostname} ${registrationSessionId ?? 'NO_SESSION'}`);
         await client.join(`pc:${hostname}`);
         if (!registrationSessionId) {
@@ -194,9 +185,11 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             .emit('pc:status-update', {
             hostname,
             status: 'ONLINE',
+            labName: payload.labName ?? null,
             studentId: client.data.user?.sub ?? null,
             sessionId: session.id,
             sessionCode: session.sessionCode,
+            lastSeen: new Date().toISOString(),
         });
         this.sessionRealtimeService.emitPolicyUpdated(session.id, {
             sessionId: session.id,
@@ -371,7 +364,6 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             });
             return;
         }
-        this.logger.log(`[TRACE-PC] teacher subscribe requested sessionId=${payload.sessionId}`);
         const session = await this.prisma
             .classSession
             .findFirst({
@@ -396,25 +388,17 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             return;
         }
         const sessionRoom = `session:${session.id}`;
-        this.logger.log(`[TRACE-PC] teacher subscribe resolved session UUID=${session.id}`);
         await client.join(sessionRoom);
         this.logger.log(`[PC-CONTROL] Teacher subscribed session ${session.id}`);
         const pcs = await this.pcsService
             .listPcsForSession(session.id);
         this.logger.log(`[PC-CONTROL] PCs found for session ${session.id}: ${pcs.length}`);
-        this.logger.log(`[TRACE-PC] PCs returned=${JSON.stringify(pcs.map(pc => ({
-            hostname: pc.hostname,
-            status: pc.status,
-            currentSessionId: pc.currentSessionId,
-            currentStudentId: pc.currentStudentId,
-        })))}`);
         client.emit('teacher:subscribed', {
             sessionId: session.id,
             sessionCode: session.sessionCode,
         });
         client.emit('pc:list', pcs);
         this.logger.log(`[PC-CONTROL] pc:list emitted count ${pcs.length}`);
-        this.logger.log(`[TRACE-PC] pc:list count=${pcs.length}`);
     }
     async onTeacherCommand(client, payload) {
         const user = client.data.user;

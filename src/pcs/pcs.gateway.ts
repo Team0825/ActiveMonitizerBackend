@@ -575,14 +575,20 @@ if (!isAgent && !isStudent) {
           status:
             'ONLINE',
 
-          studentId:
-  client.data.user?.sub ?? null,
+          labName:
+            payload.labName ?? null,
 
-sessionId:
-  session.id,
+          studentId:
+            client.data.user?.sub ?? null,
+
+          sessionId:
+            session.id,
 
           sessionCode:
             session.sessionCode,
+
+          lastSeen:
+            new Date().toISOString(),
         },
       );
 

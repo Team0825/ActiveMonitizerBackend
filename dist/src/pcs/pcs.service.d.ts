@@ -287,7 +287,7 @@ export declare class PcsService {
         internetConnected: boolean | null;
         latencyMs: number | null;
         lastHealthCheck: Date | null;
-        lastSystemReport: Date | null;
+        lastSystemReport: Date;
         lastSyncAt: Date | null;
         registeredAt: Date;
         updatedAt: Date;

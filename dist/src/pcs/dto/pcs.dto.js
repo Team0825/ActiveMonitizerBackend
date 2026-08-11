@@ -26,6 +26,7 @@ function assertTeacherCommandPayload(p) {
         'UNFREEZE',
         'SHUTDOWN',
         'MESSAGE',
+        'CAPTURE',
     ];
     if (!validActions.includes(p.action)) {
         throw new Error(`action must be one of ${validActions.join(', ')}`);
@@ -61,6 +62,7 @@ function assertPcCommandAckPayload(p) {
         'UNFREEZE',
         'SHUTDOWN',
         'MESSAGE',
+        'CAPTURE',
     ];
     if (!validActions.includes(p.action)) {
         throw new Error('Invalid command action');

@@ -4,7 +4,8 @@ export type PcCommandAction =
   | 'FREEZE'
   | 'UNFREEZE'
   | 'SHUTDOWN'
-  | 'MESSAGE';
+  | 'MESSAGE'
+  | 'CAPTURE';
 
 /*
  * ============================================================
@@ -126,6 +127,12 @@ export interface PcCommandAckPayload {
    */
 
   error?: string;
+
+  /*
+   * Optional image URL / Base64 data URL for CAPTURE.
+   */
+
+  imageUrl?: string;
 }
 
 /*
@@ -197,6 +204,7 @@ export function assertTeacherCommandPayload(
       'UNFREEZE',
       'SHUTDOWN',
       'MESSAGE',
+      'CAPTURE',
     ];
 
   if (
@@ -273,6 +281,7 @@ export function assertPcCommandAckPayload(
       'UNFREEZE',
       'SHUTDOWN',
       'MESSAGE',
+      'CAPTURE',
     ];
 
   if (
@@ -284,8 +293,6 @@ export function assertPcCommandAckPayload(
       'Invalid command action',
     );
   }
-
-  
 }
 /*
  * ============================================================
