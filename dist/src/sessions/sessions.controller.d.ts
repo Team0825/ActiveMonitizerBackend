@@ -180,6 +180,7 @@ export declare class SessionsController {
         startupUrl?: string | null | undefined;
         questionMode?: string | undefined;
         sessionCode?: string | undefined;
+        cbtCode?: string | null | undefined;
         policyVersion?: number | undefined;
         teacherId?: string | undefined;
         status?: string | undefined;

@@ -22,6 +22,7 @@ const teachers_module_1 = require("./teachers/teachers.module");
 const notification_module_1 = require("./notifications/notification.module");
 const realtime_module_1 = require("./realtime/realtime.module");
 const cbt_module_1 = require("./cbt/cbt.module");
+const agent_theme_module_1 = require("./agent-theme/agent-theme.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -47,6 +48,7 @@ exports.AppModule = AppModule = __decorate([
             teachers_module_1.TeachersModule,
             notification_module_1.NotificationsModule,
             cbt_module_1.CbtModule,
+            agent_theme_module_1.AgentThemeModule,
             realtime_module_1.RealtimeModule,
         ],
         providers: [

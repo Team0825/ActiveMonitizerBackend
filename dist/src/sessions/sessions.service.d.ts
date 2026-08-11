@@ -63,6 +63,7 @@ export declare class SessionsService {
         startupUrl?: string | null | undefined;
         questionMode?: string | undefined;
         sessionCode?: string | undefined;
+        cbtCode?: string | null | undefined;
         policyVersion?: number | undefined;
         teacherId?: string | undefined;
         status?: string | undefined;

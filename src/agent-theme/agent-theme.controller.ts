@@ -10,7 +10,6 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { AgentThemeService } from './agent-theme.service';
 
 @Controller('agent-theme')
-@UseGuards(RolesGuard)
 export class AgentThemeController {
   constructor(private readonly agentThemeService: AgentThemeService) {}
 
@@ -19,12 +18,11 @@ export class AgentThemeController {
    * GET ACTIVE THEME
    * ==========================================
    * GET /agent-theme/active
-   * * Accessible by: ADMIN, TEACHER, STUDENT
-   * Used by the Windows Agent on startup/login
-   * to download the organization's custom UI.
+   * * Accessible by: ALL (Public, ADMIN, TEACHER, STUDENT)
+   * Used by the Windows Agent and Admin Settings
+   * to load the organization's custom UI.
    */
   @Get('active')
-  @Roles('ADMIN', 'TEACHER', 'STUDENT')
   getActiveTheme() {
     return this.agentThemeService.getActiveTheme();
   }
@@ -39,6 +37,7 @@ export class AgentThemeController {
    * colors, labels, and branding.
    */
   @Patch('active')
+  @UseGuards(RolesGuard)
   @Roles('ADMIN')
   updateActiveTheme(@Body() updateData: any) {
     return this.agentThemeService.updateActiveTheme(updateData);

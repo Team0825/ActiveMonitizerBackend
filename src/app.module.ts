@@ -55,6 +55,10 @@ import {
   CbtModule,
 } from './cbt/cbt.module';
 
+import {
+  AgentThemeModule,
+} from './agent-theme/agent-theme.module';
+
 @Module({
   imports: [
     /*
@@ -97,6 +101,7 @@ import {
     TeachersModule,
     NotificationsModule,
     CbtModule,
+    AgentThemeModule,
 
     /*
      * ==========================================

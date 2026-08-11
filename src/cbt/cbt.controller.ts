@@ -15,14 +15,20 @@ import { JwtPayload } from '../auth/jwt.strategy';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CbtService } from './cbt.service';
 import {
+  AuthorityPasswordDto,
+  CorrectResultDto,
   CreateExamDto,
   CreateQuestionDto,
   CreateQuestionPaperDto,
+  GenerateResultsDto,
+  LockPcConfigDto,
+  RegisterPcDto,
   SaveAnswerDto,
   StartExamDto,
   SubmitExamDto,
   UpdateExamDto,
   UpdateQuestionPaperDto,
+  VerifyAuthorityPasswordDto,
 } from './dto/cbt.dto';
 
 type AuthenticatedRequest = Request & { user: JwtPayload };
@@ -34,7 +40,78 @@ export class CbtController {
 
   /*
    * ==========================================================
-   * 1. QUESTION PAPERS (ADMIN / TEACHER)
+   * 1. AUTHORITY PASSWORD MANAGEMENT
+   * ==========================================================
+   */
+
+  @Get('authority-password/status')
+  @Roles('ADMIN')
+  getAuthorityPasswordStatus() {
+    return this.cbtService.getAuthorityPasswordStatus();
+  }
+
+  @Post('authority-password')
+  @Roles('ADMIN')
+  setAuthorityPassword(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: AuthorityPasswordDto,
+  ) {
+    return this.cbtService.setAuthorityPassword(dto.password, req.user.sub);
+  }
+
+  @Post('authority-password/verify')
+  verifyAuthorityPassword(@Body() dto: VerifyAuthorityPasswordDto) {
+    return this.cbtService.verifyAuthorityPassword(dto.password);
+  }
+
+  /*
+   * ==========================================================
+   * 2. CBT CODE GENERATOR & PC REGISTRATION
+   * ==========================================================
+   */
+
+  @Post('code/generate')
+  @Roles('ADMIN', 'TEACHER')
+  async generateCode() {
+    const cbtCode = await this.cbtService.generateUniqueCbtCode();
+    return { cbtCode };
+  }
+
+  @Post('register-pc')
+  registerPc(@Body() dto: RegisterPcDto) {
+    return this.cbtService.registerPcForCbt(dto);
+  }
+
+  @Get('pcs')
+  @Roles('ADMIN', 'TEACHER')
+  listRegisteredPcs(@Query('cbtCode') cbtCode?: string, @Query('examId') examId?: string) {
+    const target = examId || cbtCode || '';
+    return this.cbtService.listRegisteredPcs(target);
+  }
+
+  @Delete('pcs/:pcHostname')
+  @Roles('ADMIN', 'TEACHER')
+  deleteRegisteredPc(
+    @Param('pcHostname') pcHostname: string,
+    @Query('cbtCode') cbtCode?: string,
+    @Query('examId') examId?: string,
+  ) {
+    const target = examId || cbtCode || '';
+    return this.cbtService.deleteRegisteredPc(target, pcHostname);
+  }
+
+  @Post('exams/:id/lock-pcs')
+  @Roles('ADMIN', 'TEACHER')
+  lockPcConfig(
+    @Param('id') id: string,
+    @Body() dto: LockPcConfigDto,
+  ) {
+    return this.cbtService.savePcConfig(id, dto.isLocked);
+  }
+
+  /*
+   * ==========================================================
+   * 3. QUESTION PAPERS (ADMIN / TEACHER)
    * ==========================================================
    */
 
@@ -83,6 +160,16 @@ export class CbtController {
     return this.cbtService.addQuestion(paperId, dto);
   }
 
+  @Patch('question-papers/:paperId/questions/:questionId')
+  @Roles('ADMIN', 'TEACHER')
+  updateQuestion(
+    @Param('paperId') paperId: string,
+    @Param('questionId') questionId: string,
+    @Body() dto: Partial<CreateQuestionDto>,
+  ) {
+    return this.cbtService.updateQuestion(paperId, questionId, dto);
+  }
+
   @Delete('question-papers/:paperId/questions/:questionId')
   @Roles('ADMIN', 'TEACHER')
   deleteQuestion(
@@ -94,7 +181,7 @@ export class CbtController {
 
   /*
    * ==========================================================
-   * 2. EXAMS (ADMIN / TEACHER)
+   * 4. EXAMS (ADMIN / TEACHER)
    * ==========================================================
    */
 
@@ -152,18 +239,15 @@ export class CbtController {
     return this.cbtService.getExamStats(id);
   }
 
-  @Get('results')
+  @Get('exams/:id/corrections')
   @Roles('ADMIN', 'TEACHER')
-  getResults(
-    @Query('examId') examId?: string,
-    @Query('sessionId') sessionId?: string,
-  ) {
-    return this.cbtService.getResults(examId, sessionId);
+  getCorrectionAudit(@Param('id') id: string) {
+    return this.cbtService.getCorrectionAudit(id);
   }
 
   /*
    * ==========================================================
-   * 3. STUDENT EXAM ATTEMPTS & RESULTS (STUDENT)
+   * 5. STUDENT EXAM ATTEMPTS & RESULTS (STUDENT)
    * ==========================================================
    */
 
@@ -171,8 +255,9 @@ export class CbtController {
   getStudentActiveExam(
     @Req() req: AuthenticatedRequest,
     @Query('session') sessionCodeOrId?: string,
+    @Query('pcHostname') pcHostname?: string,
   ) {
-    return this.cbtService.getStudentActiveExam(req.user.sub, sessionCodeOrId);
+    return this.cbtService.getStudentActiveExam(req.user.sub, sessionCodeOrId, pcHostname);
   }
 
   @Post('student/start')
@@ -205,5 +290,39 @@ export class CbtController {
     @Param('examId') examId: string,
   ) {
     return this.cbtService.getStudentResult(req.user.sub, examId);
+  }
+
+  /*
+   * ==========================================================
+   * 6. RESULTS, MANUAL CORRECTIONS & GENERATION (ADMIN / TEACHER)
+   * ==========================================================
+   */
+
+  @Get('results')
+  @Roles('ADMIN', 'TEACHER')
+  getResults(
+    @Query('examId') examId?: string,
+    @Query('sessionId') sessionId?: string,
+  ) {
+    return this.cbtService.getResults(examId, sessionId);
+  }
+
+  @Post('results/:id/correct')
+  @Roles('ADMIN')
+  correctResult(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') resultId: string,
+    @Body() dto: CorrectResultDto,
+  ) {
+    return this.cbtService.correctResult(resultId, req.user.sub, dto);
+  }
+
+  @Post('exams/:id/generate-results')
+  @Roles('ADMIN', 'TEACHER')
+  generateResults(
+    @Param('id') examId: string,
+    @Body() dto: GenerateResultsDto,
+  ) {
+    return this.cbtService.generateResults(examId, dto);
   }
 }

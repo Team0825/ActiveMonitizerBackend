@@ -286,3 +286,52 @@ export class SubmitExamDto {
   @IsBoolean()
   isAutoSubmit?: boolean = false;
 }
+
+export class RegisterPcDto {
+  @IsString()
+  cbtCode: string;
+
+  @IsString()
+  pcHostname: string;
+
+  @IsOptional()
+  @IsString()
+  pcId?: string;
+
+  @IsOptional()
+  @IsString()
+  authorityPassword?: string;
+}
+
+export class AuthorityPasswordDto {
+  @IsString()
+  password: string;
+}
+
+export class VerifyAuthorityPasswordDto {
+  @IsString()
+  password: string;
+}
+
+export class CorrectResultDto {
+  @IsNumber()
+  obtainedMarks: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class GenerateResultsDto {
+  @IsString()
+  scope: 'ALL' | 'SELECTED';
+
+  @IsOptional()
+  @IsArray()
+  studentIds?: string[];
+}
+
+export class LockPcConfigDto {
+  @IsBoolean()
+  isLocked: boolean;
+}

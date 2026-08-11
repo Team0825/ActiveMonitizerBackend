@@ -81,7 +81,8 @@ model ClassSession {
 
   id String @id @default(uuid())
 
-  sessionCode String @unique
+  sessionCode String  @unique
+  cbtCode     String? @unique
   classTitle  String
 
   teacherId String
@@ -113,6 +114,7 @@ model ClassSession {
   @@index([status])
   @@index([createdAt])
   @@index([teacherId])
+  @@index([cbtCode])
 }
 
 model Pc {
@@ -583,6 +585,11 @@ model Exam {
   description         String?
   instructions        String?
 
+  cbtCode             String?        @unique
+  reviewPeriodHours   Int            @default(24)
+  canGenerateResultAt DateTime?
+  isPcConfigLocked    Boolean        @default(false)
+
   questionPaperId     String
   questionPaper       QuestionPaper  @relation(fields: [questionPaperId], references: [id])
 
@@ -610,6 +617,7 @@ model Exam {
 
   attempts            ExamAttempt[]
   results             ExamResult[]
+  pcRegistrations     CbtPcRegistration[]
 
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
@@ -618,6 +626,7 @@ model Exam {
   @@index([sessionId])
   @@index([createdById])
   @@index([status])
+  @@index([cbtCode])
 }
 
 model ExamAttempt {
@@ -700,6 +709,8 @@ model ExamResult {
   evaluatedAt     DateTime     @default(now())
   publishedAt     DateTime?
 
+  corrections     ResultCorrectionAudit[]
+
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -707,5 +718,51 @@ model ExamResult {
   @@index([examId])
   @@index([studentId])
   @@index([status])
+}
+
+model CbtPcRegistration {
+  id           String       @id @default(uuid())
+  examId       String?
+  exam         Exam?        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sessionId    String?
+  cbtCode      String
+  pcHostname   String
+  pcId         String?
+  status       String       @default("REGISTERED")
+  registeredAt DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([cbtCode, pcHostname])
+  @@index([cbtCode])
+  @@index([sessionId])
+  @@index([examId])
+  @@index([pcHostname])
+}
+
+model AuthoritySetting {
+  id           String   @id @default(uuid())
+  key          String   @unique @default("AUTHORITY_PASSWORD")
+  passwordHash String
+  updatedById  String?
+  updatedAt    DateTime @updatedAt
+}
+
+model ResultCorrectionAudit {
+  id            String      @id @default(uuid())
+  examResultId  String
+  examResult    ExamResult  @relation(fields: [examResultId], references: [id], onDelete: Cascade)
+  examId        String
+  studentId     String
+  adminId       String
+  previousMarks Float
+  newMarks      Float
+  previousGrade String?
+  newGrade      String?
+  reason        String?
+  correctedAt   DateTime    @default(now())
+
+  @@index([examResultId])
+  @@index([examId])
+  @@index([studentId])
 }
 
