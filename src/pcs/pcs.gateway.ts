@@ -939,6 +939,12 @@ this.sessionRealtimeService.emitPolicyUpdated(
             payload.active,
 
             payload.sampleSeconds,
+
+            payload.activityPercentage,
+
+            payload.activeApp,
+
+            payload.idleSeconds,
           );
 
       client.emit(
@@ -955,8 +961,10 @@ this.sessionRealtimeService.emitPolicyUpdated(
           activity,
         );
 
+      this.server.emit('pc:activity-update', activity);
+
       this.logger.debug(
-        `Activity update from ${hostname}: ${activity.activityPercentage}%`,
+        `Activity update from ${hostname}: ${activity.activityPercentage}% | App: ${activity.activeApp}`,
       );
     } catch (error) {
       this.logger.warn(

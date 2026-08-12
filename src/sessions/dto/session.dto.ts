@@ -70,6 +70,14 @@ export class CreateSessionDto {
   @IsOptional()
   allowOffline?: boolean;
 
+  @IsString()
+  @IsOptional()
+  connectivityMode?: 'ONLINE_ONLY' | 'OFFLINE_ONLY' | 'HYBRID';
+
+  @IsString()
+  @IsOptional()
+  websiteAccessMode?: 'NORMAL' | 'ALLOWED_ONLY' | 'BLOCKED';
+
   @IsBoolean()
   @IsOptional()
   restrictExistingFiles?: boolean;
@@ -77,6 +85,28 @@ export class CreateSessionDto {
   @IsBoolean()
   @IsOptional()
   restrictUnauthorizedApps?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  activityMonitoring?: boolean;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  activityUpdateInterval?: number;
+
+  @IsString()
+  @IsOptional()
+  activitySensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  idleThresholdSeconds?: number;
+
+  @IsString()
+  @IsOptional()
+  violationSensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
 
   @IsBoolean()
   @IsOptional()

@@ -349,6 +349,12 @@ export interface PcActivityPayload {
 
   sampleSeconds: number;
 
+  activityPercentage?: number;
+
+  activeApp?: string;
+
+  idleSeconds?: number;
+
   /*
    * Optional timestamp generated
    * by the Windows Agent.

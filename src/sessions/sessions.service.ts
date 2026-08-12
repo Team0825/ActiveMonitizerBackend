@@ -197,6 +197,14 @@ export class SessionsService {
                 dto.allowOffline ??
                 true,
 
+              connectivityMode:
+                dto.connectivityMode ??
+                'HYBRID',
+
+              websiteAccessMode:
+                dto.websiteAccessMode ??
+                'NORMAL',
+
               restrictExistingFiles:
                 dto.restrictExistingFiles ??
                 false,
@@ -204,6 +212,26 @@ export class SessionsService {
               restrictUnauthorizedApps:
                 dto.restrictUnauthorizedApps ??
                 false,
+
+              activityMonitoring:
+                dto.activityMonitoring ??
+                true,
+
+              activityUpdateInterval:
+                dto.activityUpdateInterval ??
+                2,
+
+              activitySensitivity:
+                dto.activitySensitivity ??
+                'NORMAL',
+
+              idleThresholdSeconds:
+                dto.idleThresholdSeconds ??
+                10,
+
+              violationSensitivity:
+                dto.violationSensitivity ??
+                'NORMAL',
 
               screenshotInterval:
                 dto.screenshotInterval,
@@ -1295,11 +1323,32 @@ export class SessionsService {
           allowOffline:
             session.allowOffline,
 
+          connectivityMode:
+            session.connectivityMode,
+
+          websiteAccessMode:
+            session.websiteAccessMode,
+
           restrictExistingFiles:
             session.restrictExistingFiles,
 
           restrictUnauthorizedApps:
             session.restrictUnauthorizedApps,
+
+          activityMonitoring:
+            session.activityMonitoring,
+
+          activityUpdateInterval:
+            session.activityUpdateInterval,
+
+          activitySensitivity:
+            session.activitySensitivity,
+
+          idleThresholdSeconds:
+            session.idleThresholdSeconds,
+
+          violationSensitivity:
+            session.violationSensitivity,
 
           warningMinutes:
             session.warningMinutes,
@@ -1773,6 +1822,10 @@ async getSessionPolicy(
   }
 
   return {
+    id: session.id,
+    sessionId: session.id,
+    sessionCode: session.sessionCode,
+    classTitle: session.classTitle,
     allowInternet: session.allowInternet,
     allowClipboard: session.allowClipboard,
     allowUsb: session.allowUsb,
@@ -1781,10 +1834,22 @@ async getSessionPolicy(
     allowWindowsKey: session.allowWindowsKey,
     allowPrintScreen: session.allowPrintScreen,
     allowOffline: session.allowOffline,
+    connectivityMode: session.connectivityMode,
+    websiteAccessMode: session.websiteAccessMode,
     restrictExistingFiles:
       session.restrictExistingFiles,
     restrictUnauthorizedApps:
       session.restrictUnauthorizedApps,
+    activityMonitoring:
+      session.activityMonitoring,
+    activityUpdateInterval:
+      session.activityUpdateInterval,
+    activitySensitivity:
+      session.activitySensitivity,
+    idleThresholdSeconds:
+      session.idleThresholdSeconds,
+    violationSensitivity:
+      session.violationSensitivity,
     freezeOnEnd: session.freezeOnEnd,
     warningMinutes:
       session.warningMinutes,
@@ -1864,11 +1929,32 @@ async updateSessionPolicy(
           allowOffline:
             dto.allowOffline,
 
+          connectivityMode:
+            dto.connectivityMode,
+
+          websiteAccessMode:
+            dto.websiteAccessMode,
+
           restrictExistingFiles:
             dto.restrictExistingFiles,
 
           restrictUnauthorizedApps:
             dto.restrictUnauthorizedApps,
+
+          activityMonitoring:
+            dto.activityMonitoring,
+
+          activityUpdateInterval:
+            dto.activityUpdateInterval,
+
+          activitySensitivity:
+            dto.activitySensitivity,
+
+          idleThresholdSeconds:
+            dto.idleThresholdSeconds,
+
+          violationSensitivity:
+            dto.violationSensitivity,
 
           freezeOnEnd:
             dto.freezeOnEnd,
@@ -1965,8 +2051,14 @@ async updateSessionPolicy(
     },
   );
 
-  return this.getSessionPolicy(
+  const updatedPolicy = await this.getSessionPolicy(
     sessionId,
   );
+
+  // Broadcast updated policy in realtime to all connected Agents and Teacher consoles
+  this.sessionRealtimeService.emitPolicyUpdated(sessionId, updatedPolicy);
+  this.sessionRealtimeService.emitToSession(sessionId, 'session:policy', updatedPolicy);
+
+  return updatedPolicy;
 }
 }

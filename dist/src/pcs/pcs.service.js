@@ -192,7 +192,7 @@ let PcsService = class PcsService {
             },
         });
     }
-    async recordActivity(hostname, sessionId, studentId, active, sampleSeconds) {
+    async recordActivity(hostname, sessionId, studentId, active, sampleSeconds, reportedPercentage, activeApp, idleSeconds) {
         const normalizedHostname = hostname.trim();
         const session = await this.prisma.classSession.findFirst({
             where: {
@@ -263,9 +263,12 @@ let PcsService = class PcsService {
             : 0;
         const updatedActiveSeconds = Math.min(elapsedSeconds, currentActiveSeconds +
             additionalActiveSeconds);
-        const activityPercentage = Math.min(100, Math.max(0, Math.round((updatedActiveSeconds /
+        const cumulativePercentage = Math.min(100, Math.max(0, Math.round((updatedActiveSeconds /
             elapsedSeconds) *
             100)));
+        const liveActivityPercentage = typeof reportedPercentage === 'number' && !isNaN(reportedPercentage)
+            ? Math.min(100, Math.max(0, Math.round(reportedPercentage)))
+            : cumulativePercentage;
         await this.prisma.attendance.update({
             where: {
                 sessionId_studentId: {
@@ -275,7 +278,7 @@ let PcsService = class PcsService {
             },
             data: {
                 presentSeconds: updatedActiveSeconds,
-                activityPercent: activityPercentage,
+                activityPercent: cumulativePercentage,
             },
         });
         await this.touchHeartbeat(normalizedHostname);
@@ -288,7 +291,9 @@ let PcsService = class PcsService {
             sampleSeconds,
             activeSeconds: updatedActiveSeconds,
             elapsedSeconds,
-            activityPercentage,
+            activityPercentage: liveActivityPercentage,
+            activeApp: activeApp || 'Active',
+            idleSeconds: idleSeconds ?? 0,
             updatedAt: now.toISOString(),
         };
     }

@@ -8,8 +8,15 @@ export declare class UpdateSessionPolicyDto {
     allowPrintScreen?: boolean;
     freezeOnEnd?: boolean;
     allowOffline?: boolean;
+    connectivityMode?: 'ONLINE_ONLY' | 'OFFLINE_ONLY' | 'HYBRID';
+    websiteAccessMode?: 'NORMAL' | 'ALLOWED_ONLY' | 'BLOCKED';
     restrictExistingFiles?: boolean;
     restrictUnauthorizedApps?: boolean;
+    activityMonitoring?: boolean;
+    activityUpdateInterval?: number;
+    activitySensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
+    idleThresholdSeconds?: number;
+    violationSensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
     sessionMode?: 'LAB' | 'EXAM' | 'VIVA';
     questionMode?: 'COMMON' | 'INDIVIDUAL' | 'GROUP';
     screenshotInterval?: number;

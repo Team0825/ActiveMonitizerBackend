@@ -324,12 +324,13 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         }
         try {
             const activity = await this.pcsService
-                .recordActivity(hostname, payload.sessionId, user.sub, payload.active, payload.sampleSeconds);
+                .recordActivity(hostname, payload.sessionId, user.sub, payload.active, payload.sampleSeconds, payload.activityPercentage, payload.activeApp, payload.idleSeconds);
             client.emit('pc:activity-update', activity);
             this.server
                 .to(`session:${activity.sessionId}`)
                 .emit('pc:activity-update', activity);
-            this.logger.debug(`Activity update from ${hostname}: ${activity.activityPercentage}%`);
+            this.server.emit('pc:activity-update', activity);
+            this.logger.debug(`Activity update from ${hostname}: ${activity.activityPercentage}% | App: ${activity.activeApp}`);
         }
         catch (error) {
             this.logger.warn(`Activity report rejected from ${hostname}: ${error instanceof Error

@@ -85,10 +85,24 @@ let SessionsService = class SessionsService {
                         false,
                     allowOffline: dto.allowOffline ??
                         true,
+                    connectivityMode: dto.connectivityMode ??
+                        'HYBRID',
+                    websiteAccessMode: dto.websiteAccessMode ??
+                        'NORMAL',
                     restrictExistingFiles: dto.restrictExistingFiles ??
                         false,
                     restrictUnauthorizedApps: dto.restrictUnauthorizedApps ??
                         false,
+                    activityMonitoring: dto.activityMonitoring ??
+                        true,
+                    activityUpdateInterval: dto.activityUpdateInterval ??
+                        2,
+                    activitySensitivity: dto.activitySensitivity ??
+                        'NORMAL',
+                    idleThresholdSeconds: dto.idleThresholdSeconds ??
+                        10,
+                    violationSensitivity: dto.violationSensitivity ??
+                        'NORMAL',
                     screenshotInterval: dto.screenshotInterval,
                     warningMinutes: dto.warningMinutes ??
                         5,
@@ -568,8 +582,15 @@ let SessionsService = class SessionsService {
                 allowPrintScreen: session.allowPrintScreen,
                 freezeOnEnd: session.freezeOnEnd,
                 allowOffline: session.allowOffline,
+                connectivityMode: session.connectivityMode,
+                websiteAccessMode: session.websiteAccessMode,
                 restrictExistingFiles: session.restrictExistingFiles,
                 restrictUnauthorizedApps: session.restrictUnauthorizedApps,
+                activityMonitoring: session.activityMonitoring,
+                activityUpdateInterval: session.activityUpdateInterval,
+                activitySensitivity: session.activitySensitivity,
+                idleThresholdSeconds: session.idleThresholdSeconds,
+                violationSensitivity: session.violationSensitivity,
                 warningMinutes: session.warningMinutes,
                 screenshotInterval: session.screenshotInterval,
                 sessionMode: session.sessionMode,
@@ -773,6 +794,10 @@ let SessionsService = class SessionsService {
             throw new common_1.NotFoundException('Session not found');
         }
         return {
+            id: session.id,
+            sessionId: session.id,
+            sessionCode: session.sessionCode,
+            classTitle: session.classTitle,
             allowInternet: session.allowInternet,
             allowClipboard: session.allowClipboard,
             allowUsb: session.allowUsb,
@@ -781,8 +806,15 @@ let SessionsService = class SessionsService {
             allowWindowsKey: session.allowWindowsKey,
             allowPrintScreen: session.allowPrintScreen,
             allowOffline: session.allowOffline,
+            connectivityMode: session.connectivityMode,
+            websiteAccessMode: session.websiteAccessMode,
             restrictExistingFiles: session.restrictExistingFiles,
             restrictUnauthorizedApps: session.restrictUnauthorizedApps,
+            activityMonitoring: session.activityMonitoring,
+            activityUpdateInterval: session.activityUpdateInterval,
+            activitySensitivity: session.activitySensitivity,
+            idleThresholdSeconds: session.idleThresholdSeconds,
+            violationSensitivity: session.violationSensitivity,
             freezeOnEnd: session.freezeOnEnd,
             warningMinutes: session.warningMinutes,
             screenshotInterval: session.screenshotInterval,
@@ -811,8 +843,15 @@ let SessionsService = class SessionsService {
                     allowWindowsKey: dto.allowWindowsKey,
                     allowPrintScreen: dto.allowPrintScreen,
                     allowOffline: dto.allowOffline,
+                    connectivityMode: dto.connectivityMode,
+                    websiteAccessMode: dto.websiteAccessMode,
                     restrictExistingFiles: dto.restrictExistingFiles,
                     restrictUnauthorizedApps: dto.restrictUnauthorizedApps,
+                    activityMonitoring: dto.activityMonitoring,
+                    activityUpdateInterval: dto.activityUpdateInterval,
+                    activitySensitivity: dto.activitySensitivity,
+                    idleThresholdSeconds: dto.idleThresholdSeconds,
+                    violationSensitivity: dto.violationSensitivity,
                     freezeOnEnd: dto.freezeOnEnd,
                     warningMinutes: dto.warningMinutes,
                     screenshotInterval: dto.screenshotInterval,
@@ -875,7 +914,10 @@ let SessionsService = class SessionsService {
                 });
             }
         });
-        return this.getSessionPolicy(sessionId);
+        const updatedPolicy = await this.getSessionPolicy(sessionId);
+        this.sessionRealtimeService.emitPolicyUpdated(sessionId, updatedPolicy);
+        this.sessionRealtimeService.emitToSession(sessionId, 'session:policy', updatedPolicy);
+        return updatedPolicy;
     }
 };
 exports.SessionsService = SessionsService;

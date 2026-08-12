@@ -454,6 +454,9 @@ export class PcsService {
     studentId: string,
     active: boolean,
     sampleSeconds: number,
+    reportedPercentage?: number,
+    activeApp?: string,
+    idleSeconds?: number,
   ) {
     const normalizedHostname =
       hostname.trim();
@@ -596,10 +599,7 @@ export class PcsService {
     }
 
     /*
-     * For now, presentSeconds is used as the
-     * accumulated ACTIVE PC interaction time.
-     *
-     * Only active samples increase it.
+     * presentSeconds is used as the accumulated ACTIVE PC interaction time.
      */
 
     const currentActiveSeconds =
@@ -613,11 +613,6 @@ export class PcsService {
           )
         : 0;
 
-    /*
-     * Prevent active time from exceeding
-     * the actual elapsed Session time.
-     */
-
     const updatedActiveSeconds =
       Math.min(
         elapsedSeconds,
@@ -626,10 +621,12 @@ export class PcsService {
       );
 
     /*
-     * Calculate live PC activity percentage.
+     * Live PC activity percentage:
+     * If Agent calculated smoothed activity percentage locally, use that.
+     * Otherwise calculate based on active/elapsed session time.
      */
 
-    const activityPercentage =
+    const cumulativePercentage =
       Math.min(
         100,
         Math.max(
@@ -644,12 +641,13 @@ export class PcsService {
         ),
       );
 
+    const liveActivityPercentage =
+      typeof reportedPercentage === 'number' && !isNaN(reportedPercentage)
+        ? Math.min(100, Math.max(0, Math.round(reportedPercentage)))
+        : cumulativePercentage;
+
     /*
-     * Update attendance with the latest
-     * accumulated activity time.
-     *
-     * Final attendance approval still happens
-     * when the Session ends.
+     * Update attendance with latest accumulated activity.
      */
 
     await this.prisma.attendance.update({
@@ -667,7 +665,7 @@ export class PcsService {
           updatedActiveSeconds,
 
         activityPercent:
-          activityPercentage,
+          cumulativePercentage,
       },
     });
 
@@ -682,12 +680,6 @@ export class PcsService {
 
     /*
      * Return realtime activity information.
-     *
-     * The Gateway will broadcast this to:
-     *
-     * - Student Agent
-     * - Teacher Dashboard
-     * - Admin Dashboard
      */
 
     return {
@@ -711,7 +703,14 @@ export class PcsService {
 
       elapsedSeconds,
 
-      activityPercentage,
+      activityPercentage:
+        liveActivityPercentage,
+
+      activeApp:
+        activeApp || 'Active',
+
+      idleSeconds:
+        idleSeconds ?? 0,
 
       updatedAt:
         now.toISOString(),

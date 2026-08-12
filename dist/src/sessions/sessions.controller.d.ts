@@ -114,8 +114,15 @@ export declare class SessionsController {
         allowPrintScreen: boolean;
         freezeOnEnd: boolean;
         allowOffline: boolean;
+        connectivityMode: string;
+        websiteAccessMode: string;
         restrictExistingFiles: boolean;
         restrictUnauthorizedApps: boolean;
+        activityMonitoring: boolean;
+        activityUpdateInterval: number;
+        activitySensitivity: string;
+        idleThresholdSeconds: number;
+        violationSensitivity: string;
         warningMinutes: number;
         screenshotInterval: number | null;
         sessionMode: string;
@@ -171,8 +178,15 @@ export declare class SessionsController {
         allowWindowsKey?: boolean | undefined;
         allowPrintScreen?: boolean | undefined;
         allowOffline?: boolean | undefined;
+        connectivityMode?: string | undefined;
+        websiteAccessMode?: string | undefined;
         restrictExistingFiles?: boolean | undefined;
         restrictUnauthorizedApps?: boolean | undefined;
+        activityMonitoring?: boolean | undefined;
+        activityUpdateInterval?: number | undefined;
+        activitySensitivity?: string | undefined;
+        idleThresholdSeconds?: number | undefined;
+        violationSensitivity?: string | undefined;
         freezeOnEnd?: boolean | undefined;
         warningMinutes?: number | undefined;
         screenshotInterval?: number | null | undefined;
@@ -284,6 +298,10 @@ export declare class SessionsController {
         alreadyEnded?: undefined;
     }>;
     getSessionPolicy(id: string): Promise<{
+        id: string;
+        sessionId: string;
+        sessionCode: string;
+        classTitle: string;
         allowInternet: boolean;
         allowClipboard: boolean;
         allowUsb: boolean;
@@ -292,8 +310,15 @@ export declare class SessionsController {
         allowWindowsKey: boolean;
         allowPrintScreen: boolean;
         allowOffline: boolean;
+        connectivityMode: string;
+        websiteAccessMode: string;
         restrictExistingFiles: boolean;
         restrictUnauthorizedApps: boolean;
+        activityMonitoring: boolean;
+        activityUpdateInterval: number;
+        activitySensitivity: string;
+        idleThresholdSeconds: number;
+        violationSensitivity: string;
         freezeOnEnd: boolean;
         warningMinutes: number;
         screenshotInterval: number | null;
@@ -307,6 +332,10 @@ export declare class SessionsController {
         blockedApplications: string[];
     }>;
     updateSessionPolicy(id: string, dto: UpdateSessionPolicyDto): Promise<{
+        id: string;
+        sessionId: string;
+        sessionCode: string;
+        classTitle: string;
         allowInternet: boolean;
         allowClipboard: boolean;
         allowUsb: boolean;
@@ -315,8 +344,15 @@ export declare class SessionsController {
         allowWindowsKey: boolean;
         allowPrintScreen: boolean;
         allowOffline: boolean;
+        connectivityMode: string;
+        websiteAccessMode: string;
         restrictExistingFiles: boolean;
         restrictUnauthorizedApps: boolean;
+        activityMonitoring: boolean;
+        activityUpdateInterval: number;
+        activitySensitivity: string;
+        idleThresholdSeconds: number;
+        violationSensitivity: string;
         freezeOnEnd: boolean;
         warningMinutes: number;
         screenshotInterval: number | null;

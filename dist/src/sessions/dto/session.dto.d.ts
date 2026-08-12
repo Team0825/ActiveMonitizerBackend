@@ -11,8 +11,15 @@ export declare class CreateSessionDto {
     allowWindowsKey?: boolean;
     allowPrintScreen?: boolean;
     allowOffline?: boolean;
+    connectivityMode?: 'ONLINE_ONLY' | 'OFFLINE_ONLY' | 'HYBRID';
+    websiteAccessMode?: 'NORMAL' | 'ALLOWED_ONLY' | 'BLOCKED';
     restrictExistingFiles?: boolean;
     restrictUnauthorizedApps?: boolean;
+    activityMonitoring?: boolean;
+    activityUpdateInterval?: number;
+    activitySensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
+    idleThresholdSeconds?: number;
+    violationSensitivity?: 'LOW' | 'NORMAL' | 'HIGH';
     freezeOnEnd?: boolean;
     warningMinutes?: number;
     screenshotInterval?: number;

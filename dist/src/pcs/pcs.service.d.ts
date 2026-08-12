@@ -185,7 +185,7 @@ export declare class PcsService {
         targetUser: string | null;
         metadata: string | null;
     }>;
-    recordActivity(hostname: string, sessionId: string, studentId: string, active: boolean, sampleSeconds: number): Promise<{
+    recordActivity(hostname: string, sessionId: string, studentId: string, active: boolean, sampleSeconds: number, reportedPercentage?: number, activeApp?: string, idleSeconds?: number): Promise<{
         hostname: string;
         sessionId: string;
         sessionCode: string;
@@ -195,6 +195,8 @@ export declare class PcsService {
         activeSeconds: number;
         elapsedSeconds: number;
         activityPercentage: number;
+        activeApp: string;
+        idleSeconds: number;
         updatedAt: string;
     }>;
     updateSystemInfo(hostname: string, info: PcSystemInfoPayload): Promise<{

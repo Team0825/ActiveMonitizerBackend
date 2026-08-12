@@ -45,6 +45,9 @@ export interface PcActivityPayload {
     sessionId: string;
     active: boolean;
     sampleSeconds: number;
+    activityPercentage?: number;
+    activeApp?: string;
+    idleSeconds?: number;
     recordedAt?: string;
 }
 export declare function assertPcActivityPayload(p: any): asserts p is PcActivityPayload;
