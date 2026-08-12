@@ -1271,6 +1271,13 @@ export class SessionsService {
           },
 
           include: {
+            teacher: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
             _count: {
               select: {
                 participants: true,
@@ -1320,6 +1327,9 @@ export class SessionsService {
           sessionCode:
             session.sessionCode,
 
+          cbtCode:
+            session.cbtCode,
+
           classTitle:
             session.classTitle,
 
@@ -1341,9 +1351,18 @@ export class SessionsService {
           teacherId:
             session.teacherId,
 
+          teacher:
+            session.teacher
+              ? {
+                  id: session.teacher.id,
+                  name: session.teacher.name,
+                  username: session.teacher.username,
+                }
+              : null,
+
           participantCount:
             session._count
-              .participants,
+              ?.participants ?? 0,
 
           allowInternet:
             session.allowInternet,

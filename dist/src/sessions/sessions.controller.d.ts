@@ -97,6 +97,7 @@ export declare class SessionsController {
         id: string;
         sessionId: string;
         sessionCode: string;
+        cbtCode: string | null;
         classTitle: string;
         durationMinutes: number;
         joinWindowMinutes: number;
@@ -104,6 +105,11 @@ export declare class SessionsController {
         endsAt: Date;
         status: string;
         teacherId: string;
+        teacher: {
+            id: string;
+            name: string | null;
+            username: string;
+        } | null;
         participantCount: number;
         allowInternet: boolean;
         allowClipboard: boolean;

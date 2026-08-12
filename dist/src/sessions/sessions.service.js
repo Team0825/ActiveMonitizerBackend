@@ -588,6 +588,13 @@ let SessionsService = class SessionsService {
                 createdAt: 'desc',
             },
             include: {
+                teacher: {
+                    select: {
+                        id: true,
+                        name: true,
+                        username: true,
+                    },
+                },
                 _count: {
                     select: {
                         participants: true,
@@ -608,6 +615,7 @@ let SessionsService = class SessionsService {
                 id: session.id,
                 sessionId: session.sessionCode,
                 sessionCode: session.sessionCode,
+                cbtCode: session.cbtCode,
                 classTitle: session.classTitle,
                 durationMinutes: session.durationMinutes,
                 joinWindowMinutes: session.joinWindowMinutes,
@@ -615,8 +623,15 @@ let SessionsService = class SessionsService {
                 endsAt: session.endsAt,
                 status: session.status,
                 teacherId: session.teacherId,
+                teacher: session.teacher
+                    ? {
+                        id: session.teacher.id,
+                        name: session.teacher.name,
+                        username: session.teacher.username,
+                    }
+                    : null,
                 participantCount: session._count
-                    .participants,
+                    ?.participants ?? 0,
                 allowInternet: session.allowInternet,
                 allowClipboard: session.allowClipboard,
                 allowUsb: session.allowUsb,
