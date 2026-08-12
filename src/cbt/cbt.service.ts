@@ -117,6 +117,22 @@ export class CbtService {
     return { valid: isValid };
   }
 
+  async recordRecoveryAudit(dto: { pcHostname: string; sessionId?: string; examId?: string; reason?: string }) {
+    return this.prisma.auditLog.create({
+      data: {
+        actorId: 'ADMIN_EMERGENCY_RECOVERY',
+        action: 'ADMIN_EMERGENCY_RECOVERY',
+        targetPc: dto.pcHostname,
+        metadata: JSON.stringify({
+          sessionId: dto.sessionId || null,
+          examId: dto.examId || null,
+          reason: dto.reason || 'Win+Alt+C Emergency Recovery executed',
+          occurredAt: new Date().toISOString(),
+        }),
+      },
+    });
+  }
+
   /*
    * ==========================================================
    * 2. PC REGISTRATION & REAL-TIME STATUS FOR CBT

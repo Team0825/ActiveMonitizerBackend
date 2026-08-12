@@ -14,6 +14,8 @@ const admin_users_service_1 = require("./admin-users.service");
 const admin_attendance_controller_1 = require("./admin-attendance.controller");
 const teacher_attendance_controller_1 = require("./teacher-attendance.controller");
 const admin_attendance_service_1 = require("./admin-attendance.service");
+const data_management_controller_1 = require("./data-management.controller");
+const data_management_service_1 = require("./data-management.service");
 let AdminModule = class AdminModule {
 };
 exports.AdminModule = AdminModule;
@@ -27,10 +29,12 @@ exports.AdminModule = AdminModule = __decorate([
             admin_users_controller_1.TeacherStudentsController,
             admin_attendance_controller_1.AdminAttendanceController,
             teacher_attendance_controller_1.TeacherAttendanceController,
+            data_management_controller_1.DataManagementController,
         ],
         providers: [
             admin_users_service_1.AdminUsersService,
             admin_attendance_service_1.AdminAttendanceService,
+            data_management_service_1.DataManagementService,
         ],
     })
 ], AdminModule);

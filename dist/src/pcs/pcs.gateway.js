@@ -227,10 +227,10 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             });
             return;
         }
-        const allowedWebsites = sessionWithPolicy.allowedWebsites.map(site => site.domain);
-        const blockedWebsites = sessionWithPolicy.blockedWebsites.map(site => site.domain);
-        const allowedApplications = sessionWithPolicy.allowedApplications.map(app => app.processName);
-        const blockedApplications = sessionWithPolicy.blockedApplications.map(app => app.processName);
+        const allowedWebsites = sessionWithPolicy.allowedWebsites?.map((site) => site.domain) ?? [];
+        const blockedWebsites = sessionWithPolicy.blockedWebsites?.map((site) => site.domain) ?? [];
+        const allowedApplications = sessionWithPolicy.allowedApplications?.map((app) => app.processName) ?? [];
+        const blockedApplications = sessionWithPolicy.blockedApplications?.map((app) => app.processName) ?? [];
         const policy = {
             allowInternet: sessionWithPolicy.allowInternet,
             allowClipboard: sessionWithPolicy.allowClipboard,

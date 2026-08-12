@@ -63,6 +63,9 @@ let SessionsController = class SessionsController {
         return this.sessionsService
             .handleAccessRequest(req.user.sub, req.user.role, dto);
     }
+    listAccessRequests(req, sessionId) {
+        return this.sessionsService.listAccessRequests(req.user.sub, req.user.role, sessionId);
+    }
     participants(id) {
         return this.sessionsService
             .getOnlineParticipants(id);
@@ -123,6 +126,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, session_dto_1.HandleAccessRequestDto]),
     __metadata("design:returntype", void 0)
 ], SessionsController.prototype, "handleAccess", null);
+__decorate([
+    (0, common_1.Get)('special-access'),
+    (0, roles_guard_1.Roles)('TEACHER', 'ADMIN'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('sessionId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", void 0)
+], SessionsController.prototype, "listAccessRequests", null);
 __decorate([
     (0, common_1.Get)(':id/participants'),
     (0, roles_guard_1.Roles)('TEACHER', 'ADMIN'),

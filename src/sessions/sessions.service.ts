@@ -999,24 +999,24 @@ export class SessionsService {
             session.startupUrl,  
 
         allowedWebsites:
-          session.allowedWebsites.map(
-            site => site.domain,
-          ),
+          session.allowedWebsites?.map(
+            (site) => site.domain,
+          ) ?? [],
 
         blockedWebsites:
-          session.blockedWebsites.map(
-            site => site.domain,
-          ),
+          session.blockedWebsites?.map(
+            (site) => site.domain,
+          ) ?? [],
 
         allowedApplications:
-          session.allowedApplications.map(
-            app => app.processName,
-          ),
+          session.allowedApplications?.map(
+            (app) => app.processName,
+          ) ?? [],
 
         blockedApplications:
-          session.blockedApplications.map(
-            app => app.processName,
-          ),
+          session.blockedApplications?.map(
+            (app) => app.processName,
+          ) ?? [],
       },
 
       participant,
@@ -1156,7 +1156,7 @@ export class SessionsService {
       );
     }
 
-    return this.prisma
+    const updated = await this.prisma
       .specialAccessRequest
       .update({
         where: {
@@ -1176,7 +1176,56 @@ export class SessionsService {
           handledAt:
             new Date(),
         },
+        include: {
+          session: true,
+          student: {
+            select: { id: true, username: true, regNumber: true, name: true },
+          },
+        },
       });
+
+    // Broadcast realtime event
+    const eventName = dto.approve ? 'special-access:approved' : 'special-access:rejected';
+    this.sessionRealtimeService.emitToSession(request.sessionId, eventName, {
+      requestId: updated.id,
+      sessionId: updated.sessionId,
+      sessionCode: request.session.sessionCode,
+      studentId: updated.studentId,
+      status: updated.status,
+      handledById: actorId,
+      handledAt: updated.handledAt,
+    });
+
+    const socketServer = (this.sessionRealtimeService as any).server;
+    if (socketServer) {
+      socketServer.emit(eventName, {
+        requestId: updated.id,
+        sessionId: updated.sessionId,
+        sessionCode: request.session.sessionCode,
+        studentId: updated.studentId,
+        status: updated.status,
+      });
+    }
+
+    return updated;
+  }
+
+  async listAccessRequests(actorId: string, actorRole: 'TEACHER' | 'ADMIN', sessionId?: string) {
+    return this.prisma.specialAccessRequest.findMany({
+      where: {
+        sessionId: sessionId || undefined,
+        session: actorRole === 'TEACHER' ? { teacherId: actorId } : undefined,
+      },
+      include: {
+        student: {
+          select: { id: true, username: true, regNumber: true, name: true },
+        },
+        session: {
+          select: { id: true, sessionCode: true, classTitle: true, createdAt: true, joinWindowMinutes: true, endsAt: true },
+        },
+      },
+      orderBy: { requestedAt: 'desc' },
+    });
   }
 
   /*
@@ -1238,24 +1287,24 @@ export class SessionsService {
     return sessions.map(
       (session) => {
         const allowedWebsites =
-          session.allowedWebsites.map(
-            site => site.domain,
-          );
+          session.allowedWebsites?.map(
+            (site) => site.domain,
+          ) ?? [];
 
         const blockedWebsites =
-          session.blockedWebsites.map(
-            site => site.domain,
-          );
+          session.blockedWebsites?.map(
+            (site) => site.domain,
+          ) ?? [];
 
         const allowedApplications =
-          session.allowedApplications.map(
-            app => app.processName,
-          );
+          session.allowedApplications?.map(
+            (app) => app.processName,
+          ) ?? [];
 
         const blockedApplications =
-          session.blockedApplications.map(
-            app => app.processName,
-          );
+          session.blockedApplications?.map(
+            (app) => app.processName,
+          ) ?? [];
 
         return {
           id:
@@ -1866,24 +1915,24 @@ async getSessionPolicy(
     session.startupUrl,
 
     allowedWebsites:
-      session.allowedWebsites.map(
-        s => s.domain,
-      ),
+      session.allowedWebsites?.map(
+        (s) => s.domain,
+      ) ?? [],
 
     blockedWebsites:
-      session.blockedWebsites.map(
-        s => s.domain,
-      ),
+      session.blockedWebsites?.map(
+        (s) => s.domain,
+      ) ?? [],
 
     allowedApplications:
-      session.allowedApplications.map(
-        a => a.processName,
-      ),
+      session.allowedApplications?.map(
+        (a) => a.processName,
+      ) ?? [],
 
     blockedApplications:
-      session.blockedApplications.map(
-        a => a.processName,
-      ),
+      session.blockedApplications?.map(
+        (a) => a.processName,
+      ) ?? [],
   };
 }
 

@@ -204,6 +204,50 @@ export declare class SessionsService {
         handledAt: Date | null;
     }>;
     handleAccessRequest(actorId: string, actorRole: 'TEACHER' | 'ADMIN', dto: HandleAccessRequestDto): Promise<{
+        session: {
+            id: string;
+            createdAt: Date;
+            classTitle: string;
+            durationMinutes: number;
+            joinWindowMinutes: number;
+            sessionMode: string;
+            allowInternet: boolean;
+            allowClipboard: boolean;
+            allowUsb: boolean;
+            allowTaskManager: boolean;
+            allowAltTab: boolean;
+            allowWindowsKey: boolean;
+            allowPrintScreen: boolean;
+            allowOffline: boolean;
+            connectivityMode: string;
+            websiteAccessMode: string;
+            restrictExistingFiles: boolean;
+            restrictUnauthorizedApps: boolean;
+            activityMonitoring: boolean;
+            activityUpdateInterval: number;
+            activitySensitivity: string;
+            idleThresholdSeconds: number;
+            violationSensitivity: string;
+            freezeOnEnd: boolean;
+            warningMinutes: number;
+            screenshotInterval: number | null;
+            instructions: string | null;
+            startupUrl: string | null;
+            questionMode: string;
+            sessionCode: string;
+            cbtCode: string | null;
+            policyVersion: number;
+            teacherId: string;
+            status: string;
+            endsAt: Date;
+        };
+        student: {
+            id: string;
+            username: string;
+            regNumber: string | null;
+            name: string | null;
+        };
+    } & {
         id: string;
         sessionId: string;
         status: string;
@@ -212,6 +256,30 @@ export declare class SessionsService {
         handledById: string | null;
         handledAt: Date | null;
     }>;
+    listAccessRequests(actorId: string, actorRole: 'TEACHER' | 'ADMIN', sessionId?: string): Promise<({
+        session: {
+            id: string;
+            createdAt: Date;
+            classTitle: string;
+            joinWindowMinutes: number;
+            sessionCode: string;
+            endsAt: Date;
+        };
+        student: {
+            id: string;
+            username: string;
+            regNumber: string | null;
+            name: string | null;
+        };
+    } & {
+        id: string;
+        sessionId: string;
+        status: string;
+        studentId: string;
+        requestedAt: Date;
+        handledById: string | null;
+        handledAt: Date | null;
+    })[]>;
     getSessions(actorId: string, actorRole: 'TEACHER' | 'ADMIN'): Promise<{
         id: string;
         sessionId: string;

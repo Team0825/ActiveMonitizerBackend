@@ -27,6 +27,14 @@ import {
   AdminAttendanceService,
 } from './admin-attendance.service';
 
+import {
+  DataManagementController,
+} from './data-management.controller';
+
+import {
+  DataManagementService,
+} from './data-management.service';
+
 @Module({
   imports: [
     AuthModule,
@@ -37,11 +45,13 @@ import {
     TeacherStudentsController,
     AdminAttendanceController,
     TeacherAttendanceController,
+    DataManagementController,
   ],
 
   providers: [
     AdminUsersService,
     AdminAttendanceService,
+    DataManagementService,
   ],
 })
 export class AdminModule {}

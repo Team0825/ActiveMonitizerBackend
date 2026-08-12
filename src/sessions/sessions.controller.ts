@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -280,6 +281,19 @@ export class SessionsController {
         req.user.role,
         dto,
       );
+  }
+
+  @Get('special-access')
+  @Roles('TEACHER', 'ADMIN')
+  listAccessRequests(
+    @Req() req: TeacherAdminRequest,
+    @Query('sessionId') sessionId?: string,
+  ) {
+    return this.sessionsService.listAccessRequests(
+      req.user.sub,
+      req.user.role,
+      sessionId,
+    );
   }
 
   /*

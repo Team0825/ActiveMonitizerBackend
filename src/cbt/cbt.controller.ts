@@ -64,6 +64,11 @@ export class CbtController {
     return this.cbtService.verifyAuthorityPassword(dto.password);
   }
 
+  @Post('recovery-audit')
+  recordRecoveryAudit(@Body() dto: { pcHostname: string; sessionId?: string; examId?: string; reason?: string }) {
+    return this.cbtService.recordRecoveryAudit(dto);
+  }
+
   /*
    * ==========================================================
    * 2. CBT CODE GENERATOR & PC REGISTRATION

@@ -662,24 +662,24 @@ this.sessionRealtimeService.emitPolicyUpdated(
      */
 
     const allowedWebsites =
-      sessionWithPolicy.allowedWebsites.map(
-        site => site.domain,
-      );
+      sessionWithPolicy.allowedWebsites?.map(
+        (site) => site.domain,
+      ) ?? [];
 
     const blockedWebsites =
-      sessionWithPolicy.blockedWebsites.map(
-        site => site.domain,
-      );
+      sessionWithPolicy.blockedWebsites?.map(
+        (site) => site.domain,
+      ) ?? [];
 
     const allowedApplications =
-      sessionWithPolicy.allowedApplications.map(
-        app => app.processName,
-      );
+      sessionWithPolicy.allowedApplications?.map(
+        (app) => app.processName,
+      ) ?? [];
 
     const blockedApplications =
-      sessionWithPolicy.blockedApplications.map(
-        app => app.processName,
-      );
+      sessionWithPolicy.blockedApplications?.map(
+        (app) => app.processName,
+      ) ?? [];
 
     const policy = {
       allowInternet:
