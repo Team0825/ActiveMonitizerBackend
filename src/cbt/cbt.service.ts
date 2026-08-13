@@ -100,7 +100,12 @@ export class CbtService {
     });
   }
 
-  async verifyAuthorityPassword(password: string): Promise<{ valid: boolean }> {
+  private readonly failedAuthorityAttempts = new Map<
+    string,
+    { count: number; lastAttempt: number; blockedUntil: number }
+  >();
+
+  async verifyAuthorityPassword(password: string, pcHostname?: string): Promise<{ valid: boolean }> {
     if (!password) return { valid: false };
 
     const setting = await this.prisma.authoritySetting.findUnique({
@@ -141,14 +146,81 @@ export class CbtService {
 
   async registerPcForCbt(dto: RegisterPcDto) {
     const cbtCode = dto.cbtCode.trim().toUpperCase();
+    const pcHostname = dto.pcHostname.trim().toUpperCase();
+    const now = Date.now();
 
-    // Verify authority password if provided
-    if (dto.authorityPassword) {
-      const auth = await this.verifyAuthorityPassword(dto.authorityPassword);
-      if (!auth.valid) {
-        throw new ForbiddenException('Invalid Authority Password. CBT PC registration rejected.');
-      }
+    // Check rate-limit block for this PC
+    const rateLimit = this.failedAuthorityAttempts.get(pcHostname);
+    if (rateLimit && rateLimit.blockedUntil > now) {
+      const waitSeconds = Math.ceil((rateLimit.blockedUntil - now) / 1000);
+      throw new ForbiddenException(
+        `Too many failed authority password attempts. PC "${pcHostname}" is locked out. Try again in ${waitSeconds} seconds.`,
+      );
     }
+
+    // Verify authority password
+    const auth = await this.verifyAuthorityPassword(dto.authorityPassword || '', pcHostname);
+    if (!auth.valid) {
+      const currentAttempts = (rateLimit?.count || 0) + 1;
+      const isLockout = currentAttempts >= 3;
+      const blockedUntil = isLockout ? now + 10 * 60 * 1000 : 0; // 10 min block
+
+      this.failedAuthorityAttempts.set(pcHostname, {
+        count: currentAttempts,
+        lastAttempt: now,
+        blockedUntil,
+      });
+
+      const severity = isLockout ? 'CRITICAL' : currentAttempts >= 2 ? 'HIGH' : 'MEDIUM';
+      const violationDetail = `Unauthorized CBT PC registration attempt on ${pcHostname} with invalid authority password (Attempt ${currentAttempts}/3).${
+        isLockout ? ' PC temporarily locked out for 10 minutes.' : ''
+      }`;
+
+      // Create security violation
+      try {
+        const violationRecord = {
+          id: `v-auth-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          hostname: pcHostname,
+          sessionId: dto.cbtCode,
+          type: 'UNAUTHORIZED_AUTHORITY_ACCESS',
+          details: violationDetail,
+          severity,
+          status: 'UNRESOLVED',
+          attempts: currentAttempts,
+          occurredAt: new Date().toISOString(),
+        };
+
+        const socketServer = this.realtimeService.getServer();
+        if (socketServer) {
+          socketServer.emit('pc:violation', violationRecord);
+        }
+
+        await this.prisma.auditLog.create({
+          data: {
+            actorId: 'UNAUTHORIZED_AGENT',
+            action: 'AUTHORITY_PASSWORD_FAILED',
+            targetPc: pcHostname,
+            metadata: JSON.stringify({
+              cbtCode,
+              attempts: currentAttempts,
+              severity,
+              blockedUntil: blockedUntil ? new Date(blockedUntil).toISOString() : null,
+            }),
+          },
+        });
+      } catch (err) {
+        // preserve error throwing
+      }
+
+      throw new ForbiddenException(
+        `Invalid Authority Password. CBT PC registration rejected.${
+          isLockout ? ' Maximum attempts exceeded — PC locked out for 10 minutes.' : ''
+        }`,
+      );
+    }
+
+    // Password is valid -> clear failed attempts
+    this.failedAuthorityAttempts.delete(pcHostname);
 
     // Find Exam or Session matching CBT Code
     const exam = await this.prisma.exam.findFirst({
@@ -168,8 +240,6 @@ export class CbtService {
     if (!exam && !session) {
       throw new NotFoundException(`Invalid or unknown CBT Code: ${cbtCode}`);
     }
-
-    const pcHostname = dto.pcHostname.trim().toUpperCase();
 
     // Ensure PC record exists in Pc table
     const existingPc = await this.prisma.pc.findUnique({

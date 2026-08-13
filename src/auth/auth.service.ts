@@ -57,6 +57,41 @@ export class AuthService {
     };
   }
 
+  async changePassword(userId: string, currentPass: string, newPass: string, confirmPass: string) {
+    if (newPass !== confirmPass) {
+      throw new UnauthorizedException('New password and confirm password do not match.');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const valid = await bcrypt.compare(currentPass, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPass, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        action: 'PASSWORD_CHANGED',
+        metadata: JSON.stringify({ userId, role: user.role, timestamp: new Date().toISOString() }),
+      },
+    });
+
+    return { success: true, message: 'Password updated successfully.' };
+  }
+
   private async audit(action: string, actorId: string | null, dto: LoginDto) {
     await this.prisma.auditLog.create({
       data: {

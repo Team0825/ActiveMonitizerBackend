@@ -23,11 +23,13 @@ const notification_module_1 = require("./notifications/notification.module");
 const realtime_module_1 = require("./realtime/realtime.module");
 const cbt_module_1 = require("./cbt/cbt.module");
 const agent_theme_module_1 = require("./agent-theme/agent-theme.module");
+const app_controller_1 = require("./app.controller");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
+        controllers: [app_controller_1.AppController],
         imports: [
             config_1.ConfigModule.forRoot({
                 isGlobal: true,

@@ -15,5 +15,9 @@ export declare class AuthService {
             classId: string | null;
         };
     }>;
+    changePassword(userId: string, currentPass: string, newPass: string, confirmPass: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
     private audit;
 }

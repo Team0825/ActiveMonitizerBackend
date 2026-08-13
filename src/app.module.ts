@@ -58,8 +58,10 @@ import {
 import {
   AgentThemeModule,
 } from './agent-theme/agent-theme.module';
+import { AppController } from './app.controller';
 
 @Module({
+  controllers: [AppController],
   imports: [
     /*
      * ==========================================
