@@ -304,6 +304,27 @@ return;
   async handleDisconnect(
     client: AuthedSocket,
   ) {
+    // Clean up spectator tracking for this client
+    for (const [host, set] of this.activeSpectators.entries()) {
+      if (set.has(client.id)) {
+        set.delete(client.id);
+        const isStillWatched = set.size > 0;
+        if (!isStillWatched) {
+          this.activeSpectators.delete(host);
+        }
+        this.server.to(`pc:${host}`).emit('pc:spectator-update', {
+          hostname: host,
+          isBeingWatched: isStillWatched,
+          spectatorCount: set.size,
+        });
+        this.server.emit('pc:spectator-update', {
+          hostname: host,
+          isBeingWatched: isStillWatched,
+          spectatorCount: set.size,
+        });
+      }
+    }
+
     const hostname =
       client.data?.hostname;
 
@@ -1573,5 +1594,195 @@ async handleSystemInfo(
     );
   }
 
+  /*
+   * ==========================================================
+   * SCREEN STREAMING & LIVE VIEW
+   * ==========================================================
+   */
+
+  @SubscribeMessage('pc:screen-update')
+  async onScreenUpdate(
+    @ConnectedSocket() _client: Socket,
+    @MessageBody()
+    payload: {
+      hostname: string;
+      captureUrl: string;
+      cpuUsage?: number;
+      memoryUsage?: number;
+      timestamp?: number;
+    },
+  ) {
+    if (!payload?.hostname || !payload?.captureUrl) return;
+    this.server.emit('pc:screen-update', payload);
+    this.server.emit('pc:screen_update', payload);
+  }
+
+  @SubscribeMessage('pc:screen_update')
+  async onScreenUpdateAlt(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    return this.onScreenUpdate(client, payload);
+  }
+
+  private readonly activeSpectators = new Map<string, Set<string>>();
+
+  @SubscribeMessage('pc:stream-start')
+  async onStreamStart(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() payload: { hostname: string; fps?: number },
+  ) {
+    const user = client.data.user;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) return;
+    if (!payload?.hostname) return;
+
+    if (payload.hostname === 'ALL') {
+      this.server.emit('pc:stream-start', payload);
+    } else {
+      const host = payload.hostname.toUpperCase();
+      if (!this.activeSpectators.has(host)) {
+        this.activeSpectators.set(host, new Set());
+      }
+      this.activeSpectators.get(host)!.add(client.id);
+
+      this.server.to(`pc:${payload.hostname}`).emit('pc:stream-start', payload);
+      this.server.to(`pc:${payload.hostname}`).emit('pc:spectator-update', {
+        hostname: payload.hostname,
+        isBeingWatched: true,
+        spectatorCount: this.activeSpectators.get(host)!.size,
+      });
+      this.server.emit('pc:spectator-update', {
+        hostname: payload.hostname,
+        isBeingWatched: true,
+        spectatorCount: this.activeSpectators.get(host)!.size,
+      });
+    }
+  }
+
+  @SubscribeMessage('pc:stream-stop')
+  async onStreamStop(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody() payload: { hostname: string },
+  ) {
+    const user = client.data.user;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) return;
+    if (!payload?.hostname) return;
+
+    if (payload.hostname === 'ALL') {
+      this.activeSpectators.clear();
+      this.server.emit('pc:stream-stop', payload);
+    } else {
+      const host = payload.hostname.toUpperCase();
+      const set = this.activeSpectators.get(host);
+      if (set) {
+        set.delete(client.id);
+        const isStillWatched = set.size > 0;
+        if (!isStillWatched) {
+          this.activeSpectators.delete(host);
+        }
+        this.server.to(`pc:${payload.hostname}`).emit('pc:stream-stop', payload);
+        this.server.to(`pc:${payload.hostname}`).emit('pc:spectator-update', {
+          hostname: payload.hostname,
+          isBeingWatched: isStillWatched,
+          spectatorCount: set.size,
+        });
+        this.server.emit('pc:spectator-update', {
+          hostname: payload.hostname,
+          isBeingWatched: isStillWatched,
+          spectatorCount: set.size,
+        });
+      } else {
+        this.server.to(`pc:${payload.hostname}`).emit('pc:stream-stop', payload);
+      }
+    }
+  }
+
+  /*
+   * ==========================================================
+   * REMOTE INPUT (TEACHER / ADMIN -> PC)
+   * ==========================================================
+   */
+
+  @SubscribeMessage('teacher:remote-input')
+  async onRemoteInput(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    payload: {
+      hostname: string;
+      type: string;
+      xPercent?: number;
+      yPercent?: number;
+      button?: number;
+      keyCode?: number;
+      key?: string;
+      text?: string;
+      deltaY?: number;
+    },
+  ) {
+    const user = client.data.user;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) return;
+    if (!payload?.hostname) return;
+    this.server.to(`pc:${payload.hostname}`).emit('pc:remote-input', payload);
+  }
+
+  /*
+   * ==========================================================
+   * DIRECT PC COMMAND (TEACHER / ADMIN -> PC WITHOUT SESSION)
+   * ==========================================================
+   */
+
+  @SubscribeMessage('teacher:direct-command')
+  async onTeacherDirectCommand(
+    @ConnectedSocket() client: AuthedSocket,
+    @MessageBody()
+    payload: {
+      targetHostname: string;
+      action: any;
+      message?: string;
+    },
+  ) {
+    const user = client.data.user;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) {
+      client.emit('error', { message: 'Only Teacher or Admin clients can send direct PC commands.' });
+      return;
+    }
+    if (!payload || !payload.targetHostname || !payload.action) {
+      client.emit('error', { message: 'targetHostname and action are required.' });
+      return;
+    }
+
+    const issuedAt = new Date();
+    const commandId = randomUUID();
+    const command: PcExecuteCommandPayload = {
+      commandId,
+      sessionId: 'DIRECT',
+      action: payload.action,
+      ...(payload.action === 'MESSAGE' || payload.action === 'WARNING'
+        ? { message: payload.message?.trim() }
+        : {}),
+      issuedBy: user.sub,
+      issuedAt: issuedAt.toISOString(),
+    };
+
+    this.pendingCommands.set(commandId, {
+      commandId,
+      sessionId: 'DIRECT',
+      issuedBy: user.sub,
+      issuedAt: issuedAt.getTime(),
+      targetHostname: payload.targetHostname,
+    });
+
+    if (payload.targetHostname === 'ALL') {
+      this.server.emit('command:execute', command);
+    } else {
+      this.server.to(`pc:${payload.targetHostname}`).emit('command:execute', command);
+    }
+
+    await this.pcsService.logCommand(user.sub, payload.action, payload.targetHostname, {
+      commandId,
+      isDirect: true,
+      targetHostname: payload.targetHostname,
+    });
+  }
 }
 

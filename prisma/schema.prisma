@@ -774,3 +774,18 @@ model ResultCorrectionAudit {
   @@index([studentId])
 }
 
+model CbtRegistrationCode {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  createdById String
+  expiresAt   DateTime
+  isUsed      Boolean   @default(false)
+  usedByPc    String?
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([code])
+  @@index([isUsed])
+}
+
+

@@ -63,6 +63,60 @@ export class CbtService {
     throw new BadRequestException('Failed to generate a unique CBT code. Please try again.');
   }
 
+  async generateOneTimeCbtCode(adminId: string): Promise<{ cbtCode: string; expiresAt: Date }> {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = 'CBT-';
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.prisma.cbtRegistrationCode.create({
+      data: {
+        code,
+        createdById: adminId,
+        expiresAt,
+      },
+    });
+
+    return { cbtCode: code, expiresAt };
+  }
+
+  async checkCbtPcStatus(pcHostname: string) {
+    const upperHost = pcHostname.trim().toUpperCase();
+    const registration = await this.prisma.cbtPcRegistration.findFirst({
+      where: { pcHostname: upperHost, status: 'REGISTERED' },
+      orderBy: { registeredAt: 'desc' },
+    });
+
+    return {
+      isCbtRegistered: Boolean(registration),
+      cbtCode: registration?.cbtCode || null,
+      registration: registration || null,
+    };
+  }
+
+  async verifyAdminCredentials(adminId: string, password: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: adminId },
+    });
+
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) {
+      throw new ForbiddenException('Unauthorized. Admin/Teacher credentials required.');
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      const authorityCheck = await this.verifyAuthorityPassword(password);
+      if (!authorityCheck.valid) {
+        throw new ForbiddenException('Invalid administrative credentials.');
+      }
+    }
+
+    return { success: true, verified: true };
+  }
+
+
   /*
    * ==========================================================
    * 1. AUTHORITY PASSWORD MANAGEMENT
@@ -403,18 +457,26 @@ export class CbtService {
 
   async deleteRegisteredPc(examIdOrCode: string, pcHostname: string) {
     const upperHost = pcHostname.trim().toUpperCase();
-    const upperCode = examIdOrCode.trim().toUpperCase();
+    const upperCode = examIdOrCode ? examIdOrCode.trim().toUpperCase() : '';
 
-    await this.prisma.cbtPcRegistration.deleteMany({
-      where: {
-        pcHostname: upperHost,
-        OR: [{ cbtCode: upperCode }, { examId: examIdOrCode }],
-      },
-    });
+    if (upperCode) {
+      await this.prisma.cbtPcRegistration.deleteMany({
+        where: {
+          pcHostname: upperHost,
+          OR: [{ cbtCode: upperCode }, { examId: examIdOrCode }],
+        },
+      });
+    } else {
+      await this.prisma.cbtPcRegistration.deleteMany({
+        where: {
+          pcHostname: upperHost,
+        },
+      });
+    }
 
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
-      socketServer.emit('cbt:pc-list-updated', { cbtCode: upperCode, examId: examIdOrCode });
+      socketServer.emit('cbt:pc-list-updated', { cbtCode: upperCode, examId: examIdOrCode, pcHostname: upperHost });
     }
 
     return { success: true, pcHostname: upperHost };

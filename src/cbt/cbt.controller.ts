@@ -69,11 +69,25 @@ export class CbtController {
     return this.cbtService.recordRecoveryAudit(dto);
   }
 
-  /*
-   * ==========================================================
-   * 2. CBT CODE GENERATOR & PC REGISTRATION
-   * ==========================================================
-   */
+  @Post('admin-reauth')
+  @Roles('ADMIN', 'TEACHER')
+  adminReauth(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: { password: string },
+  ) {
+    return this.cbtService.verifyAdminCredentials(req.user.sub, dto.password);
+  }
+
+  @Post('code/generate-one-time')
+  @Roles('ADMIN', 'TEACHER')
+  generateOneTimeCode(@Req() req: AuthenticatedRequest) {
+    return this.cbtService.generateOneTimeCbtCode(req.user.sub);
+  }
+
+  @Get('pc-status')
+  getPcStatus(@Query('pcHostname') pcHostname: string) {
+    return this.cbtService.checkCbtPcStatus(pcHostname || '');
+  }
 
   @Post('code/generate')
   @Roles('ADMIN', 'TEACHER')
@@ -85,6 +99,12 @@ export class CbtController {
   @Post('register-pc')
   registerPc(@Body() dto: RegisterPcDto) {
     return this.cbtService.registerPcForCbt(dto);
+  }
+
+  @Post('deregister-pc')
+  deregisterPc(@Body() dto: { pcHostname: string; cbtCode?: string; examId?: string }) {
+    const target = dto.examId || dto.cbtCode || '';
+    return this.cbtService.deleteRegisteredPc(target, dto.pcHostname);
   }
 
   @Get('pcs')

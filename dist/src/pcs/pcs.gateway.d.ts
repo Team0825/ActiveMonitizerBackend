@@ -45,5 +45,37 @@ export declare class PcsGateway implements OnGatewayInit, OnGatewayConnection, O
         details: string;
         occurredAt?: string;
     }): Promise<void>;
+    onScreenUpdate(_client: Socket, payload: {
+        hostname: string;
+        captureUrl: string;
+        cpuUsage?: number;
+        memoryUsage?: number;
+        timestamp?: number;
+    }): Promise<void>;
+    onScreenUpdateAlt(client: Socket, payload: any): Promise<void>;
+    private readonly activeSpectators;
+    onStreamStart(client: AuthedSocket, payload: {
+        hostname: string;
+        fps?: number;
+    }): Promise<void>;
+    onStreamStop(client: AuthedSocket, payload: {
+        hostname: string;
+    }): Promise<void>;
+    onRemoteInput(client: AuthedSocket, payload: {
+        hostname: string;
+        type: string;
+        xPercent?: number;
+        yPercent?: number;
+        button?: number;
+        keyCode?: number;
+        key?: string;
+        text?: string;
+        deltaY?: number;
+    }): Promise<void>;
+    onTeacherDirectCommand(client: AuthedSocket, payload: {
+        targetHostname: string;
+        action: any;
+        message?: string;
+    }): Promise<void>;
 }
 export {};

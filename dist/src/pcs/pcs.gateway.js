@@ -31,6 +31,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         this.sessionRealtimeService = sessionRealtimeService;
         this.logger = new common_1.Logger(PcsGateway_1.name);
         this.pendingCommands = new Map();
+        this.activeSpectators = new Map();
     }
     afterInit(server) {
         this.sessionRealtimeService
@@ -79,6 +80,25 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         }
     }
     async handleDisconnect(client) {
+        for (const [host, set] of this.activeSpectators.entries()) {
+            if (set.has(client.id)) {
+                set.delete(client.id);
+                const isStillWatched = set.size > 0;
+                if (!isStillWatched) {
+                    this.activeSpectators.delete(host);
+                }
+                this.server.to(`pc:${host}`).emit('pc:spectator-update', {
+                    hostname: host,
+                    isBeingWatched: isStillWatched,
+                    spectatorCount: set.size,
+                });
+                this.server.emit('pc:spectator-update', {
+                    hostname: host,
+                    isBeingWatched: isStillWatched,
+                    spectatorCount: set.size,
+                });
+            }
+        }
         const hostname = client.data?.hostname;
         if (!hostname) {
             return;
@@ -604,6 +624,128 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         this.server.emit('pc:violation', recorded);
         this.logger.warn(`[VIOLATION] ${payload.type} on PC ${payload.hostname} in Session ${payload.sessionId}: ${payload.details}`);
     }
+    async onScreenUpdate(_client, payload) {
+        if (!payload?.hostname || !payload?.captureUrl)
+            return;
+        this.server.emit('pc:screen-update', payload);
+        this.server.emit('pc:screen_update', payload);
+    }
+    async onScreenUpdateAlt(client, payload) {
+        return this.onScreenUpdate(client, payload);
+    }
+    async onStreamStart(client, payload) {
+        const user = client.data.user;
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER'))
+            return;
+        if (!payload?.hostname)
+            return;
+        if (payload.hostname === 'ALL') {
+            this.server.emit('pc:stream-start', payload);
+        }
+        else {
+            const host = payload.hostname.toUpperCase();
+            if (!this.activeSpectators.has(host)) {
+                this.activeSpectators.set(host, new Set());
+            }
+            this.activeSpectators.get(host).add(client.id);
+            this.server.to(`pc:${payload.hostname}`).emit('pc:stream-start', payload);
+            this.server.to(`pc:${payload.hostname}`).emit('pc:spectator-update', {
+                hostname: payload.hostname,
+                isBeingWatched: true,
+                spectatorCount: this.activeSpectators.get(host).size,
+            });
+            this.server.emit('pc:spectator-update', {
+                hostname: payload.hostname,
+                isBeingWatched: true,
+                spectatorCount: this.activeSpectators.get(host).size,
+            });
+        }
+    }
+    async onStreamStop(client, payload) {
+        const user = client.data.user;
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER'))
+            return;
+        if (!payload?.hostname)
+            return;
+        if (payload.hostname === 'ALL') {
+            this.activeSpectators.clear();
+            this.server.emit('pc:stream-stop', payload);
+        }
+        else {
+            const host = payload.hostname.toUpperCase();
+            const set = this.activeSpectators.get(host);
+            if (set) {
+                set.delete(client.id);
+                const isStillWatched = set.size > 0;
+                if (!isStillWatched) {
+                    this.activeSpectators.delete(host);
+                }
+                this.server.to(`pc:${payload.hostname}`).emit('pc:stream-stop', payload);
+                this.server.to(`pc:${payload.hostname}`).emit('pc:spectator-update', {
+                    hostname: payload.hostname,
+                    isBeingWatched: isStillWatched,
+                    spectatorCount: set.size,
+                });
+                this.server.emit('pc:spectator-update', {
+                    hostname: payload.hostname,
+                    isBeingWatched: isStillWatched,
+                    spectatorCount: set.size,
+                });
+            }
+            else {
+                this.server.to(`pc:${payload.hostname}`).emit('pc:stream-stop', payload);
+            }
+        }
+    }
+    async onRemoteInput(client, payload) {
+        const user = client.data.user;
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER'))
+            return;
+        if (!payload?.hostname)
+            return;
+        this.server.to(`pc:${payload.hostname}`).emit('pc:remote-input', payload);
+    }
+    async onTeacherDirectCommand(client, payload) {
+        const user = client.data.user;
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'TEACHER')) {
+            client.emit('error', { message: 'Only Teacher or Admin clients can send direct PC commands.' });
+            return;
+        }
+        if (!payload || !payload.targetHostname || !payload.action) {
+            client.emit('error', { message: 'targetHostname and action are required.' });
+            return;
+        }
+        const issuedAt = new Date();
+        const commandId = (0, crypto_1.randomUUID)();
+        const command = {
+            commandId,
+            sessionId: 'DIRECT',
+            action: payload.action,
+            ...(payload.action === 'MESSAGE' || payload.action === 'WARNING'
+                ? { message: payload.message?.trim() }
+                : {}),
+            issuedBy: user.sub,
+            issuedAt: issuedAt.toISOString(),
+        };
+        this.pendingCommands.set(commandId, {
+            commandId,
+            sessionId: 'DIRECT',
+            issuedBy: user.sub,
+            issuedAt: issuedAt.getTime(),
+            targetHostname: payload.targetHostname,
+        });
+        if (payload.targetHostname === 'ALL') {
+            this.server.emit('command:execute', command);
+        }
+        else {
+            this.server.to(`pc:${payload.targetHostname}`).emit('command:execute', command);
+        }
+        await this.pcsService.logCommand(user.sub, payload.action, payload.targetHostname, {
+            commandId,
+            isDirect: true,
+            targetHostname: payload.targetHostname,
+        });
+    }
 };
 exports.PcsGateway = PcsGateway;
 __decorate([
@@ -671,6 +813,54 @@ __decorate([
     __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
     __metadata("design:returntype", Promise)
 ], PcsGateway.prototype, "onPcViolation", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('pc:screen-update'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onScreenUpdate", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('pc:screen_update'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onScreenUpdateAlt", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('pc:stream-start'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onStreamStart", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('pc:stream-stop'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onStreamStop", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('teacher:remote-input'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onRemoteInput", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('teacher:direct-command'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PcsGateway.prototype, "onTeacherDirectCommand", null);
 exports.PcsGateway = PcsGateway = PcsGateway_1 = __decorate([
     (0, websockets_1.WebSocketGateway)({
         namespace: '/realtime',
