@@ -2,22 +2,45 @@ import {
   Injectable,
   UnauthorizedException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { RateLimiterService } from '../common/rate-limiter.service';
+import { PcsService } from '../pcs/pcs.service';
+import { SessionRealtimeService } from '../realtime/session-realtime.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly rateLimiter: RateLimiterService,
+    private readonly pcsService: PcsService,
+    private readonly realtimeService: SessionRealtimeService,
   ) {}
 
   async login(dto: LoginDto) {
+    const cleanUsername = (dto.username || '').trim();
+    const rateLimitKey = `auth-login:${cleanUsername.toLowerCase()}`;
+
+    // 1. Check Rate Limit: 5 attempts per 2 hours
+    const limitStatus = this.rateLimiter.checkLimit(rateLimitKey);
+    if (!limitStatus.allowed) {
+      throw new HttpException(
+        'Too many attempts. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { username: dto.username },
+      where: { username: cleanUsername },
     });
 
     // Always compare against *some* hash even on a miss, to avoid
@@ -26,7 +49,48 @@ export class AuthService {
     const passwordOk = await bcrypt.compare(dto.password, passwordHash);
 
     if (!user || !passwordOk || !user.isActive) {
+      // Record failed attempt
+      const attemptResult = this.rateLimiter.recordAttempt(rateLimitKey);
+
       await this.audit('LOGIN_FAILED', null, dto);
+
+      // Create Security Violation
+      try {
+        const violationType = attemptResult.isNewlyBlocked
+          ? 'RATE_LIMIT_TRIGGERED'
+          : dto.expectedRole === 'ADMIN'
+            ? 'FAILED_ADMIN_LOGIN'
+            : 'FAILED_LOGIN';
+
+        const severity = attemptResult.isNewlyBlocked ? 'HIGH' : 'MEDIUM';
+        const violationDetails = attemptResult.isNewlyBlocked
+          ? `Rate limit triggered: Maximum 5 failed login attempts reached for ${cleanUsername}. Account blocked for 2 hours.`
+          : `Failed login attempt for ${cleanUsername} (${dto.expectedRole}) on ${dto.pcHostname || 'Management Portal'}. (Attempt ${attemptResult.attempts}/5)`;
+
+        const violation = await this.pcsService.logViolation(
+          dto.pcHostname || 'Management Portal',
+          null,
+          violationType,
+          violationDetails,
+          new Date().toISOString(),
+          severity,
+        );
+
+        const socketServer = this.realtimeService.getServer();
+        if (socketServer) {
+          socketServer.emit('pc:violation', violation);
+        }
+      } catch (err) {
+        this.logger.error('Failed to record login failure violation:', err);
+      }
+
+      if (!attemptResult.allowed) {
+        throw new HttpException(
+          'Too many attempts. Please try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -36,6 +100,9 @@ export class AuthService {
         `This account is not a ${dto.expectedRole.toLowerCase()} account`,
       );
     }
+
+    // Reset rate limit on successful authentication
+    this.rateLimiter.reset(rateLimitKey);
 
     await this.audit('LOGIN', user.id, dto);
 

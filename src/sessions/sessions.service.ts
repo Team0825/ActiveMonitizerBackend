@@ -3,6 +3,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 
 import {
@@ -28,9 +31,13 @@ import {
   RequestSpecialAccessDto,
 } from './dto/session.dto';
 import { UpdateSessionPolicyDto } from './dto/session-policy.dto';
+import { RateLimiterService } from '../common/rate-limiter.service';
+import { PcsService } from '../pcs/pcs.service';
 
 @Injectable()
 export class SessionsService {
+  private readonly logger = new Logger(SessionsService.name);
+
   constructor(
     private readonly prisma:
       PrismaService,
@@ -40,6 +47,12 @@ export class SessionsService {
 
     private readonly sessionRealtimeService:
       SessionRealtimeService,
+
+    private readonly rateLimiter:
+      RateLimiterService,
+
+    private readonly pcsService:
+      PcsService,
   ) {}
 
   /*
@@ -375,6 +388,15 @@ export class SessionsService {
         .trim()
         .toUpperCase();
 
+    const rateLimitKey = `student-login:${dto.pcHostname || 'pc'}:${regNumber.toUpperCase()}`;
+    const limitStatus = this.rateLimiter.checkLimit(rateLimitKey);
+    if (!limitStatus.allowed) {
+      throw new HttpException(
+        'Too many attempts. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     /*
      * ----------------------------------------
      * VALIDATE STUDENT
@@ -390,24 +412,45 @@ export class SessionsService {
           },
         });
 
-    if (!student) {
-      throw new NotFoundException(
-        'Student registration number not found.',
-      );
-    }
+    if (!student || student.role !== 'STUDENT' || !student.isActive) {
+      const attemptResult = this.rateLimiter.recordAttempt(rateLimitKey);
+      try {
+        const violation = await this.pcsService.logViolation(
+          dto.pcHostname || 'Workstation',
+          sessionCode || null,
+          attemptResult.isNewlyBlocked ? 'RATE_LIMIT_TRIGGERED' : 'FAILED_STUDENT_LOGIN',
+          attemptResult.isNewlyBlocked
+            ? `Rate limit triggered: Maximum 5 failed student login attempts reached for ${regNumber} on ${dto.pcHostname || 'PC'}.`
+            : `Failed student login attempt with regNumber "${regNumber}" on ${dto.pcHostname || 'PC'}. (Attempt ${attemptResult.attempts}/5)`,
+          new Date().toISOString(),
+          attemptResult.isNewlyBlocked ? 'HIGH' : 'LOW',
+          student ? { id: student.id, name: student.name, username: student.username, regNumber: student.regNumber } : null,
+        );
+        const socketServer = this.sessionRealtimeService.getServer();
+        if (socketServer) socketServer.emit('pc:violation', violation);
+      } catch (err) {
+        this.logger.error('Failed to log student login violation:', err);
+      }
 
-    if (
-      student.role !==
-      'STUDENT'
-    ) {
-      throw new ForbiddenException(
-        'This registration number does not belong to a student account.',
-      );
-    }
+      if (!attemptResult.allowed) {
+        throw new HttpException(
+          'Too many attempts. Please try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
 
-    if (
-      !student.isActive
-    ) {
+      if (!student) {
+        throw new NotFoundException(
+          'Student registration number not found.',
+        );
+      }
+
+      if (student.role !== 'STUDENT') {
+        throw new ForbiddenException(
+          'This registration number does not belong to a student account.',
+        );
+      }
+
       throw new ForbiddenException(
         'This student account is inactive. Please contact the administrator.',
       );
@@ -670,6 +713,8 @@ export class SessionsService {
               ),
           },
         );
+
+    this.rateLimiter.reset(rateLimitKey);
 
     return {
       success:

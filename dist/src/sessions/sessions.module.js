@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const auth_module_1 = require("../auth/auth.module");
 const sessions_controller_1 = require("./sessions.controller");
 const sessions_service_1 = require("./sessions.service");
+const pcs_module_1 = require("../pcs/pcs.module");
 let SessionsModule = class SessionsModule {
 };
 exports.SessionsModule = SessionsModule;
@@ -18,6 +19,7 @@ exports.SessionsModule = SessionsModule = __decorate([
     (0, common_1.Module)({
         imports: [
             auth_module_1.AuthModule,
+            pcs_module_1.PcsModule,
         ],
         controllers: [
             sessions_controller_1.SessionsController,

@@ -55,14 +55,14 @@ import {
   CbtModule,
 } from './cbt/cbt.module';
 
-import {
-  AgentThemeModule,
-} from './agent-theme/agent-theme.module';
+import { AgentThemeModule } from './agent-theme/agent-theme.module';
+import { CommonModule } from './common/common.module';
 import { AppController } from './app.controller';
 
 @Module({
   controllers: [AppController],
   imports: [
+    CommonModule,
     /*
      * ==========================================
      * GLOBAL CONFIGURATION

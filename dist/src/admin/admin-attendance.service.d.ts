@@ -14,8 +14,8 @@ export declare class AdminAttendanceService {
         session: {
             id: string;
             createdAt: Date;
-            classTitle: string;
             sessionCode: string;
+            classTitle: string;
             teacherId: string;
             status: string;
             endsAt: Date;
@@ -82,8 +82,8 @@ export declare class AdminAttendanceService {
             session: {
                 id: string;
                 createdAt: Date;
-                classTitle: string;
                 sessionCode: string;
+                classTitle: string;
                 status: string;
                 endsAt: Date;
             };

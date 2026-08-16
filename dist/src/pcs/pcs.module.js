@@ -29,6 +29,7 @@ exports.PcsModule = PcsModule = __decorate([
             }),
         ],
         providers: [pcs_gateway_1.PcsGateway, pcs_service_1.PcsService],
+        exports: [pcs_service_1.PcsService],
     })
 ], PcsModule);
 //# sourceMappingURL=pcs.module.js.map

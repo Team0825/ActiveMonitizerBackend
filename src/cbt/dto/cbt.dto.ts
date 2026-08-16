@@ -335,3 +335,27 @@ export class LockPcConfigDto {
   @IsBoolean()
   isLocked: boolean;
 }
+
+export class AuthorityLoginDto {
+  @IsString()
+  username: string;
+
+  @IsString()
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  pcHostname?: string;
+}
+
+export class ValidateUniqueCodeDto {
+  @IsString()
+  code: string;
+
+  @IsString()
+  pcHostname: string;
+
+  @IsOptional()
+  @IsString()
+  authorityToken?: string;
+}

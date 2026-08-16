@@ -9,9 +9,12 @@ import {
 
 import { SessionsService } from './sessions.service';
 
+import { PcsModule } from '../pcs/pcs.module';
+
 @Module({
   imports: [
     AuthModule,
+    PcsModule,
   ],
 
   controllers: [

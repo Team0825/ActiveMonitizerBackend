@@ -172,10 +172,6 @@ export declare class SessionsController {
         }[] | undefined;
         id?: string | undefined;
         createdAt?: Date | undefined;
-        classTitle?: string | undefined;
-        durationMinutes?: number | undefined;
-        joinWindowMinutes?: number | undefined;
-        sessionMode?: string | undefined;
         allowInternet?: boolean | undefined;
         allowClipboard?: boolean | undefined;
         allowUsb?: boolean | undefined;
@@ -183,6 +179,20 @@ export declare class SessionsController {
         allowAltTab?: boolean | undefined;
         allowWindowsKey?: boolean | undefined;
         allowPrintScreen?: boolean | undefined;
+        freezeOnEnd?: boolean | undefined;
+        warningMinutes?: number | undefined;
+        screenshotInterval?: number | null | undefined;
+        instructions?: string | null | undefined;
+        startupUrl?: string | null | undefined;
+        policyVersion?: number | undefined;
+        sessionCode?: string | undefined;
+        cbtCode?: string | null | undefined;
+        classTitle?: string | undefined;
+        teacherId?: string | undefined;
+        durationMinutes?: number | undefined;
+        joinWindowMinutes?: number | undefined;
+        status?: string | undefined;
+        sessionMode?: string | undefined;
         allowOffline?: boolean | undefined;
         connectivityMode?: string | undefined;
         websiteAccessMode?: string | undefined;
@@ -193,17 +203,7 @@ export declare class SessionsController {
         activitySensitivity?: string | undefined;
         idleThresholdSeconds?: number | undefined;
         violationSensitivity?: string | undefined;
-        freezeOnEnd?: boolean | undefined;
-        warningMinutes?: number | undefined;
-        screenshotInterval?: number | null | undefined;
-        instructions?: string | null | undefined;
-        startupUrl?: string | null | undefined;
         questionMode?: string | undefined;
-        sessionCode?: string | undefined;
-        cbtCode?: string | null | undefined;
-        policyVersion?: number | undefined;
-        teacherId?: string | undefined;
-        status?: string | undefined;
         endsAt?: Date | undefined;
     }>;
     join(req: AuthenticatedRequest, dto: JoinSessionDto): Promise<{
@@ -262,10 +262,6 @@ export declare class SessionsController {
         session: {
             id: string;
             createdAt: Date;
-            classTitle: string;
-            durationMinutes: number;
-            joinWindowMinutes: number;
-            sessionMode: string;
             allowInternet: boolean;
             allowClipboard: boolean;
             allowUsb: boolean;
@@ -273,6 +269,20 @@ export declare class SessionsController {
             allowAltTab: boolean;
             allowWindowsKey: boolean;
             allowPrintScreen: boolean;
+            freezeOnEnd: boolean;
+            warningMinutes: number;
+            screenshotInterval: number | null;
+            instructions: string | null;
+            startupUrl: string | null;
+            policyVersion: number;
+            sessionCode: string;
+            cbtCode: string | null;
+            classTitle: string;
+            teacherId: string;
+            durationMinutes: number;
+            joinWindowMinutes: number;
+            status: string;
+            sessionMode: string;
             allowOffline: boolean;
             connectivityMode: string;
             websiteAccessMode: string;
@@ -283,17 +293,7 @@ export declare class SessionsController {
             activitySensitivity: string;
             idleThresholdSeconds: number;
             violationSensitivity: string;
-            freezeOnEnd: boolean;
-            warningMinutes: number;
-            screenshotInterval: number | null;
-            instructions: string | null;
-            startupUrl: string | null;
             questionMode: string;
-            sessionCode: string;
-            cbtCode: string | null;
-            policyVersion: number;
-            teacherId: string;
-            status: string;
             endsAt: Date;
         };
         student: {
@@ -315,9 +315,9 @@ export declare class SessionsController {
         session: {
             id: string;
             createdAt: Date;
+            sessionCode: string;
             classTitle: string;
             joinWindowMinutes: number;
-            sessionCode: string;
             endsAt: Date;
         };
         student: {

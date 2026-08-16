@@ -15,6 +15,7 @@ import { JwtPayload } from '../auth/jwt.strategy';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CbtService } from './cbt.service';
 import {
+  AuthorityLoginDto,
   AuthorityPasswordDto,
   CorrectResultDto,
   CreateExamDto,
@@ -28,6 +29,7 @@ import {
   SubmitExamDto,
   UpdateExamDto,
   UpdateQuestionPaperDto,
+  ValidateUniqueCodeDto,
   VerifyAuthorityPasswordDto,
 } from './dto/cbt.dto';
 
@@ -40,9 +42,19 @@ export class CbtController {
 
   /*
    * ==========================================================
-   * 1. AUTHORITY PASSWORD MANAGEMENT
+   * 1. AUTHORITY AUTHENTICATION & REGISTRATION
    * ==========================================================
    */
+
+  @Post('authority-login')
+  authorityLogin(@Body() dto: AuthorityLoginDto) {
+    return this.cbtService.authorityLogin(dto);
+  }
+
+  @Post('validate-unique-code')
+  validateUniqueCode(@Body() dto: ValidateUniqueCodeDto) {
+    return this.cbtService.validateUniqueCodeAndRegister(dto);
+  }
 
   @Get('authority-password/status')
   @Roles('ADMIN')

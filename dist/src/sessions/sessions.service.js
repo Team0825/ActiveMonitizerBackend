@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var SessionsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionsService = void 0;
 const common_1 = require("@nestjs/common");
@@ -15,11 +16,16 @@ const schedule_1 = require("@nestjs/schedule");
 const jwt_1 = require("@nestjs/jwt");
 const prisma_service_1 = require("../prisma/prisma.service");
 const session_realtime_service_1 = require("../realtime/session-realtime.service");
-let SessionsService = class SessionsService {
-    constructor(prisma, jwt, sessionRealtimeService) {
+const rate_limiter_service_1 = require("../common/rate-limiter.service");
+const pcs_service_1 = require("../pcs/pcs.service");
+let SessionsService = SessionsService_1 = class SessionsService {
+    constructor(prisma, jwt, sessionRealtimeService, rateLimiter, pcsService) {
         this.prisma = prisma;
         this.jwt = jwt;
         this.sessionRealtimeService = sessionRealtimeService;
+        this.rateLimiter = rateLimiter;
+        this.pcsService = pcsService;
+        this.logger = new common_1.Logger(SessionsService_1.name);
     }
     generateSessionCode() {
         const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -170,6 +176,11 @@ let SessionsService = class SessionsService {
         const sessionCode = dto.sessionId
             .trim()
             .toUpperCase();
+        const rateLimitKey = `student-login:${dto.pcHostname || 'pc'}:${regNumber.toUpperCase()}`;
+        const limitStatus = this.rateLimiter.checkLimit(rateLimitKey);
+        if (!limitStatus.allowed) {
+            throw new common_1.HttpException('Too many attempts. Please try again later.', common_1.HttpStatus.TOO_MANY_REQUESTS);
+        }
         const student = await this.prisma
             .user
             .findUnique({
@@ -177,14 +188,28 @@ let SessionsService = class SessionsService {
                 regNumber,
             },
         });
-        if (!student) {
-            throw new common_1.NotFoundException('Student registration number not found.');
-        }
-        if (student.role !==
-            'STUDENT') {
-            throw new common_1.ForbiddenException('This registration number does not belong to a student account.');
-        }
-        if (!student.isActive) {
+        if (!student || student.role !== 'STUDENT' || !student.isActive) {
+            const attemptResult = this.rateLimiter.recordAttempt(rateLimitKey);
+            try {
+                const violation = await this.pcsService.logViolation(dto.pcHostname || 'Workstation', sessionCode || null, attemptResult.isNewlyBlocked ? 'RATE_LIMIT_TRIGGERED' : 'FAILED_STUDENT_LOGIN', attemptResult.isNewlyBlocked
+                    ? `Rate limit triggered: Maximum 5 failed student login attempts reached for ${regNumber} on ${dto.pcHostname || 'PC'}.`
+                    : `Failed student login attempt with regNumber "${regNumber}" on ${dto.pcHostname || 'PC'}. (Attempt ${attemptResult.attempts}/5)`, new Date().toISOString(), attemptResult.isNewlyBlocked ? 'HIGH' : 'LOW', student ? { id: student.id, name: student.name, username: student.username, regNumber: student.regNumber } : null);
+                const socketServer = this.sessionRealtimeService.getServer();
+                if (socketServer)
+                    socketServer.emit('pc:violation', violation);
+            }
+            catch (err) {
+                this.logger.error('Failed to log student login violation:', err);
+            }
+            if (!attemptResult.allowed) {
+                throw new common_1.HttpException('Too many attempts. Please try again later.', common_1.HttpStatus.TOO_MANY_REQUESTS);
+            }
+            if (!student) {
+                throw new common_1.NotFoundException('Student registration number not found.');
+            }
+            if (student.role !== 'STUDENT') {
+                throw new common_1.ForbiddenException('This registration number does not belong to a student account.');
+            }
             throw new common_1.ForbiddenException('This student account is inactive. Please contact the administrator.');
         }
         const session = await this.prisma
@@ -294,6 +319,7 @@ let SessionsService = class SessionsService {
                 Date.now()) /
                 1000)),
         });
+        this.rateLimiter.reset(rateLimitKey);
         return {
             success: true,
             message: 'Student successfully joined the session.',
@@ -986,10 +1012,12 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], SessionsService.prototype, "handleExpiredSessions", null);
-exports.SessionsService = SessionsService = __decorate([
+exports.SessionsService = SessionsService = SessionsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         jwt_1.JwtService,
-        session_realtime_service_1.SessionRealtimeService])
+        session_realtime_service_1.SessionRealtimeService,
+        rate_limiter_service_1.RateLimiterService,
+        pcs_service_1.PcsService])
 ], SessionsService);
 //# sourceMappingURL=sessions.service.js.map

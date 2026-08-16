@@ -511,52 +511,93 @@ let PcsService = class PcsService {
             };
         });
     }
-    async logViolation(hostname, sessionId, type, details, occurredAt) {
-        const session = await this.prisma.classSession.findFirst({
-            where: {
-                OR: [
-                    { id: sessionId.trim() },
-                    { sessionCode: sessionId.trim().toUpperCase() },
-                ],
-            },
-            select: { id: true, sessionCode: true, classTitle: true },
-        });
+    async logViolation(hostname, sessionId, type, details, occurredAt, explicitSeverity, explicitStudent) {
+        const trimmedHost = (hostname || 'Unknown PC').trim();
+        let session = null;
+        if (sessionId && sessionId.trim()) {
+            session = await this.prisma.classSession.findFirst({
+                where: {
+                    OR: [
+                        { id: sessionId.trim() },
+                        { sessionCode: sessionId.trim().toUpperCase() },
+                    ],
+                },
+                select: { id: true, sessionCode: true, classTitle: true },
+            });
+        }
         const pc = await this.prisma.pc.findUnique({
-            where: { hostname: hostname.trim() },
-            select: { currentStudentId: true, displayName: true, labName: true },
+            where: { hostname: trimmedHost },
+            select: { currentStudentId: true, currentSessionId: true, displayName: true, labName: true },
         });
-        let student = null;
-        if (pc?.currentStudentId) {
+        if (!session && pc?.currentSessionId) {
+            session = await this.prisma.classSession.findUnique({
+                where: { id: pc.currentSessionId },
+                select: { id: true, sessionCode: true, classTitle: true },
+            });
+        }
+        let student = explicitStudent || null;
+        const targetStudentId = pc?.currentStudentId || student?.id;
+        if (!student && targetStudentId) {
             const studentRecord = await this.prisma.user.findUnique({
-                where: { id: pc.currentStudentId },
+                where: { id: targetStudentId },
                 select: { id: true, name: true, username: true, regNumber: true, rollNumber: true },
             });
             if (studentRecord) {
                 student = {
                     id: studentRecord.id,
                     name: studentRecord.name || studentRecord.username,
+                    username: studentRecord.username,
                     regNumber: studentRecord.regNumber || studentRecord.rollNumber,
                 };
             }
         }
+        const normType = (type || 'AGENT_TAMPER').toUpperCase();
+        let computedSeverity = explicitSeverity || 'MEDIUM';
+        if (!explicitSeverity) {
+            if (normType === 'AGENT_STOPPED' || normType === 'AGENT_TAMPER' || normType === 'RESTRICTION_BYPASS') {
+                computedSeverity = 'CRITICAL';
+            }
+            else if (normType === 'AGENT_DISCONNECTED' ||
+                normType === 'UNAUTHORIZED_AUTHORITY_ACCESS' ||
+                normType === 'FAILED_AUTHORITY_LOGIN' ||
+                normType === 'RATE_LIMIT_TRIGGERED' ||
+                normType === 'UNAUTHORIZED_APPLICATION' ||
+                normType === 'NETWORK_BYPASS' ||
+                normType === 'BROWSER_EXIT') {
+                computedSeverity = 'HIGH';
+            }
+            else if (normType === 'FAILED_LOGIN' ||
+                normType === 'FAILED_ADMIN_LOGIN' ||
+                normType === 'TASK_MANAGER_BLOCKED' ||
+                normType === 'ALT_TAB_BLOCKED' ||
+                normType === 'WINDOWS_KEY_BLOCKED' ||
+                normType === 'PRINT_SCREEN_BLOCKED' ||
+                normType === 'SHORTCUT_BYPASS' ||
+                normType === 'OTHER') {
+                computedSeverity = 'MEDIUM';
+            }
+            else if (normType === 'SPECIAL_ACCESS' || normType === 'LATE_ENTRY' || normType === 'FAILED_STUDENT_LOGIN') {
+                computedSeverity = 'LOW';
+            }
+        }
         const payload = {
             id: (0, crypto_1.randomUUID)(),
-            hostname: hostname.trim(),
-            sessionId: session?.id ?? sessionId,
-            sessionCode: session?.sessionCode ?? sessionId,
-            classTitle: session?.classTitle ?? 'Session',
-            type: type || 'AGENT_TAMPER',
-            details: details || 'Violation detected',
+            hostname: trimmedHost,
+            sessionId: session?.id ?? sessionId ?? null,
+            sessionCode: session?.sessionCode ?? sessionId ?? null,
+            classTitle: session?.classTitle ?? 'General Activity',
+            type: normType,
+            details: details || 'Security violation detected',
             student,
             occurredAt: occurredAt || new Date().toISOString(),
             status: 'UNRESOLVED',
-            severity: (type === 'AGENT_STOPPED' || type === 'AGENT_TAMPER' || type === 'RESTRICTION_BYPASS') ? 'CRITICAL' : 'WARNING',
+            severity: computedSeverity,
         };
         await this.prisma.auditLog.create({
             data: {
-                actorId: pc?.currentStudentId || 'AGENT',
+                actorId: targetStudentId || student?.username || 'AGENT',
                 action: 'VIOLATION',
-                targetPc: hostname.trim(),
+                targetPc: trimmedHost,
                 metadata: JSON.stringify(payload),
             },
         });

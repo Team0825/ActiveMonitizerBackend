@@ -294,22 +294,28 @@ export declare class PcsService {
         registeredAt: Date;
         updatedAt: Date;
     }[]>;
-    logViolation(hostname: string, sessionId: string, type: string, details: string, occurredAt?: string): Promise<{
+    logViolation(hostname: string, sessionId: string | null | undefined, type: string, details: string, occurredAt?: string, explicitSeverity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW', explicitStudent?: {
+        id?: string;
+        name?: string | null;
+        username?: string;
+        regNumber?: string | null;
+    } | null): Promise<{
         id: `${string}-${string}-${string}-${string}-${string}`;
         hostname: string;
-        sessionId: string;
-        sessionCode: string;
+        sessionId: string | null;
+        sessionCode: string | null;
         classTitle: string;
         type: string;
         details: string;
         student: {
-            id: string;
-            name: string;
+            id?: string;
+            name?: string | null;
+            username?: string;
             regNumber?: string | null;
         } | null;
         occurredAt: string;
         status: string;
-        severity: string;
+        severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
     }>;
     getViolations(sessionId?: string): Promise<any[]>;
 }

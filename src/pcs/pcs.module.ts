@@ -17,5 +17,6 @@ import { PcsController } from './pcs.controller';
     }),
   ],
   providers: [PcsGateway, PcsService],
+  exports: [PcsService],
 })
 export class PcsModule {}

@@ -12,6 +12,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { RolesGuard } from './roles.guard';
+import { PcsModule } from '../pcs/pcs.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
   imports: [
@@ -57,6 +59,8 @@ import { RolesGuard } from './roles.guard';
         };
       },
     }),
+    PcsModule,
+    RealtimeModule,
   ],
 
   controllers: [

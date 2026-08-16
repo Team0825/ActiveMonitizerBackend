@@ -123,6 +123,23 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
                 hostname,
                 status: 'OFFLINE',
             });
+            try {
+                const activeSession = await this.prisma.classSession.findUnique({
+                    where: { id: pc.currentSessionId },
+                    select: { id: true, status: true, sessionCode: true },
+                });
+                if (activeSession && activeSession.status === 'ACTIVE') {
+                    const violationRecord = await this.pcsService.logViolation(hostname, activeSession.id, 'AGENT_STOPPED', `Workstation Agent unexpectedly terminated or lost connection during active session ${activeSession.sessionCode} on ${hostname}.`, new Date().toISOString(), 'CRITICAL');
+                    this.server
+                        .to(`session:${pc.currentSessionId}`)
+                        .emit('pc:violation', violationRecord);
+                    this.server.emit('pc:violation', violationRecord);
+                    this.logger.warn(`[VIOLATION] AGENT_STOPPED recorded for ${hostname} in active session ${activeSession.sessionCode}`);
+                }
+            }
+            catch (err) {
+                this.logger.error('Error logging disconnect violation:', err);
+            }
         }
     }
     async onRegisterPc(client, payload) {

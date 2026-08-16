@@ -15,6 +15,8 @@ const auth_controller_1 = require("./auth.controller");
 const auth_service_1 = require("./auth.service");
 const jwt_strategy_1 = require("./jwt.strategy");
 const roles_guard_1 = require("./roles.guard");
+const pcs_module_1 = require("../pcs/pcs.module");
+const realtime_module_1 = require("../realtime/realtime.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -46,6 +48,8 @@ exports.AuthModule = AuthModule = __decorate([
                     };
                 },
             }),
+            pcs_module_1.PcsModule,
+            realtime_module_1.RealtimeModule,
         ],
         controllers: [
             auth_controller_1.AuthController,

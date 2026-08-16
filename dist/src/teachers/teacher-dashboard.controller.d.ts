@@ -16,9 +16,9 @@ export declare class TeacherDashboardController {
         recentSessions: {
             id: string;
             createdAt: Date;
+            sessionCode: string;
             classTitle: string;
             durationMinutes: number;
-            sessionCode: string;
             status: string;
             endsAt: Date;
             _count: {

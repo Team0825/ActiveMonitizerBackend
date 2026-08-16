@@ -4,11 +4,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  HttpException,
+  HttpStatus,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRealtimeService } from '../realtime/session-realtime.service';
+import { RateLimiterService } from '../common/rate-limiter.service';
+import { PcsService } from '../pcs/pcs.service';
 import {
+  AuthorityLoginDto,
   CorrectResultDto,
   CreateExamDto,
   CreateQuestionDto,
@@ -20,13 +28,18 @@ import {
   SubmitExamDto,
   UpdateExamDto,
   UpdateQuestionPaperDto,
+  ValidateUniqueCodeDto,
 } from './dto/cbt.dto';
 
 @Injectable()
 export class CbtService {
+  private readonly logger = new Logger(CbtService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeService: SessionRealtimeService,
+    private readonly rateLimiter: RateLimiterService,
+    private readonly pcsService: PcsService,
   ) {}
 
   /*
@@ -63,7 +76,7 @@ export class CbtService {
     throw new BadRequestException('Failed to generate a unique CBT code. Please try again.');
   }
 
-  async generateOneTimeCbtCode(adminId: string): Promise<{ cbtCode: string; expiresAt: Date }> {
+  async generateOneTimeCbtCode(adminId: string): Promise<{ cbtCode: string; code: string; expiresAt: Date }> {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     let code = 'CBT-';
     for (let i = 0; i < 6; i++) {
@@ -79,7 +92,257 @@ export class CbtService {
       },
     });
 
-    return { cbtCode: code, expiresAt };
+    return { cbtCode: code, code, expiresAt };
+  }
+
+  /*
+   * ==========================================================
+   * 1. AGENT CBT AUTHORITY LOGIN (2-STEP FLOW)
+   * ==========================================================
+   */
+
+  async authorityLogin(dto: AuthorityLoginDto) {
+    const username = (dto.username || '').trim();
+    const pcHostname = (dto.pcHostname || 'Workstation').trim().toUpperCase();
+    const rateLimitKey = `authority-login:${username.toLowerCase()}`;
+
+    // 1. Check Rate Limit (5 attempts per 2 hours)
+    const limitStatus = this.rateLimiter.checkLimit(rateLimitKey);
+    if (!limitStatus.allowed) {
+      throw new HttpException(
+        'Too many attempts. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+    });
+
+    const passwordHash = user?.passwordHash ?? '$2b$10$invalidsaltinvalidsaltinvalidsa';
+    const passwordOk = await bcrypt.compare(dto.password, passwordHash);
+
+    const isAuthority = user && (user.role === 'ADMIN' || user.role === 'TEACHER') && user.isActive;
+
+    if (!user || !passwordOk || !isAuthority) {
+      const attemptResult = this.rateLimiter.recordAttempt(rateLimitKey);
+
+      // Log Security Violation
+      try {
+        const violationType = attemptResult.isNewlyBlocked
+          ? 'RATE_LIMIT_TRIGGERED'
+          : 'FAILED_AUTHORITY_LOGIN';
+
+        const severity = attemptResult.isNewlyBlocked ? 'CRITICAL' : 'HIGH';
+        const details = attemptResult.isNewlyBlocked
+          ? `Rate limit triggered: 5 failed Authority login attempts for ${username} on ${pcHostname}. Lockout active for 2 hours.`
+          : `Failed Authority CBT login attempt for username "${username}" on ${pcHostname}. (Attempt ${attemptResult.attempts}/5)`;
+
+        const violation = await this.pcsService.logViolation(
+          pcHostname,
+          null,
+          violationType,
+          details,
+          new Date().toISOString(),
+          severity,
+          user ? { id: user.id, name: user.name, username: user.username } : null,
+        );
+
+        const socketServer = this.realtimeService.getServer();
+        if (socketServer) {
+          socketServer.emit('pc:violation', violation);
+        }
+      } catch (err) {
+        this.logger.error('Failed to log authority login violation:', err);
+      }
+
+      if (!attemptResult.allowed) {
+        throw new HttpException(
+          'Too many attempts. Please try again later.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      throw new UnauthorizedException('Invalid administrative credentials or insufficient privileges.');
+    }
+
+    // Reset rate limiter on success
+    this.rateLimiter.reset(rateLimitKey);
+
+    const authorityToken = randomUUID();
+
+    return {
+      success: true,
+      verified: true,
+      authorityToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role,
+      },
+    };
+  }
+
+  /*
+   * ==========================================================
+   * 2. UNIQUE CBT REGISTRATION CODE VALIDATION
+   * ==========================================================
+   */
+
+  async validateUniqueCodeAndRegister(dto: ValidateUniqueCodeDto) {
+    const code = (dto.code || '').trim().toUpperCase();
+    const pcHostname = (dto.pcHostname || 'Workstation').trim().toUpperCase();
+
+    if (!code) {
+      throw new BadRequestException('Unique CBT Registration Code is required.');
+    }
+
+    // 1. Check CbtRegistrationCode table (one-time codes generated by admin)
+    const regCode = await this.prisma.cbtRegistrationCode.findUnique({
+      where: { code },
+    });
+
+    const now = new Date();
+    let isOneTimeValid = false;
+
+    if (regCode && !regCode.isUsed && regCode.expiresAt > now) {
+      isOneTimeValid = true;
+      // Mark code as used
+      await this.prisma.cbtRegistrationCode.update({
+        where: { id: regCode.id },
+        data: {
+          isUsed: true,
+          usedByPc: pcHostname,
+          usedAt: now,
+        },
+      });
+    }
+
+    // 2. Also check active Exam or ClassSession cbtCode
+    const exam = await this.prisma.exam.findFirst({
+      where: { cbtCode: code },
+      include: { session: { select: { id: true, sessionCode: true, classTitle: true, status: true } } },
+    });
+
+    const session = exam?.session || (await this.prisma.classSession.findFirst({
+      where: { cbtCode: code },
+      select: { id: true, sessionCode: true, classTitle: true, status: true },
+    }));
+
+    if (!isOneTimeValid && !exam && !session) {
+      // Record violation for invalid code attempt
+      try {
+        const violation = await this.pcsService.logViolation(
+          pcHostname,
+          code,
+          'INVALID_CBT_CODE',
+          `Invalid or expired Unique CBT Registration Code "${code}" entered on ${pcHostname}.`,
+          now.toISOString(),
+          'MEDIUM',
+        );
+        const socketServer = this.realtimeService.getServer();
+        if (socketServer) {
+          socketServer.emit('pc:violation', violation);
+        }
+      } catch (err) {
+        this.logger.error('Failed to log invalid CBT code violation:', err);
+      }
+
+      throw new BadRequestException('Invalid or expired Unique CBT Registration Code.');
+    }
+
+    // 3. Ensure PC record exists in Pc table
+    const existingPc = await this.prisma.pc.findUnique({
+      where: { hostname: pcHostname },
+    });
+
+    if (!existingPc) {
+      await this.prisma.pc.create({
+        data: {
+          hostname: pcHostname,
+          displayName: pcHostname,
+          status: 'ONLINE',
+          healthStatus: 'HEALTHY',
+          internetStatus: 'ONLINE',
+          currentSessionId: session?.id || exam?.sessionId || null,
+        },
+      });
+    } else {
+      await this.prisma.pc.update({
+        where: { hostname: pcHostname },
+        data: {
+          status: 'ONLINE',
+          currentSessionId: session?.id || exam?.sessionId || existingPc.currentSessionId,
+        },
+      });
+    }
+
+    // 4. Upsert PC registration in CbtPcRegistration
+    const registration = await this.prisma.cbtPcRegistration.upsert({
+      where: {
+        cbtCode_pcHostname: {
+          cbtCode: code,
+          pcHostname,
+        },
+      },
+      create: {
+        cbtCode: code,
+        pcHostname,
+        pcId: existingPc?.id || null,
+        examId: exam?.id || null,
+        sessionId: session?.id || null,
+        status: 'REGISTERED',
+      },
+      update: {
+        examId: exam?.id || null,
+        sessionId: session?.id || null,
+        status: 'REGISTERED',
+        updatedAt: now,
+      },
+    });
+
+    // 5. Broadcast real-time Socket.IO event to Admin & Teacher dashboards
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:pc-registered', {
+        cbtCode: code,
+        examId: exam?.id,
+        sessionId: session?.id,
+        pcHostname,
+        status: 'REGISTERED',
+        registeredAt: registration.registeredAt,
+      });
+
+      socketServer.emit('cbt:pc-list-updated', {
+        cbtCode: code,
+        examId: exam?.id,
+      });
+    }
+
+    return {
+      success: true,
+      message: `PC ${pcHostname} successfully registered for CBT examination.`,
+      cbtCode: code,
+      pcHostname,
+      status: 'REGISTERED',
+      exam: exam
+        ? {
+            id: exam.id,
+            title: exam.title,
+            subject: exam.subject,
+            durationMinutes: exam.durationMinutes,
+            status: exam.status,
+          }
+        : null,
+      session: session
+        ? {
+            id: session.id,
+            sessionCode: session.sessionCode,
+            classTitle: session.classTitle,
+          }
+        : null,
+    };
   }
 
   async checkCbtPcStatus(pcHostname: string) {
@@ -476,6 +739,7 @@ export class CbtService {
 
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
+      socketServer.emit('cbt:pc-deregistered', { pcHostname: upperHost, cbtCode: upperCode });
       socketServer.emit('cbt:pc-list-updated', { cbtCode: upperCode, examId: examIdOrCode, pcHostname: upperHost });
     }
 
