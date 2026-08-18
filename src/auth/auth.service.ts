@@ -8,15 +8,38 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RateLimiterService } from '../common/rate-limiter.service';
 import { PcsService } from '../pcs/pcs.service';
 import { SessionRealtimeService } from '../realtime/session-realtime.service';
 
+interface StaffSession {
+  token: string;
+  userId: string;
+  username: string;
+  role: string;
+  pcHostname?: string;
+  lastActive: Date;
+}
+
+interface LoginChallenge {
+  id: string;
+  userId: string;
+  username: string;
+  expectedRole: string;
+  pcHostname?: string;
+  requestedAt: Date;
+  expiresAt: Date;
+  status: 'PENDING' | 'KEPT' | 'ALLOWED';
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly activeStaffSessions = new Map<string, StaffSession>();
+  private readonly pendingChallenges = new Map<string, LoginChallenge>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -39,8 +62,14 @@ export class AuthService {
       );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { username: cleanUsername },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: { equals: cleanUsername, mode: 'insensitive' } },
+          { id: cleanUsername },
+          { email: { equals: cleanUsername, mode: 'insensitive' } },
+        ],
+      },
     });
 
     // Always compare against *some* hash even on a miss, to avoid
@@ -101,6 +130,97 @@ export class AuthService {
       );
     }
 
+    // Duplicate Admin/Teacher Login Protection (Item 14)
+    if ((user.role === 'ADMIN' || user.role === 'TEACHER') && !dto.forceLogin) {
+      const existingSession = this.activeStaffSessions.get(user.id);
+      const isSessionActive =
+        existingSession &&
+        Date.now() - existingSession.lastActive.getTime() < 4 * 60 * 60 * 1000;
+
+      if (isSessionActive) {
+        if (dto.challengeId) {
+          const challenge = this.pendingChallenges.get(dto.challengeId);
+          if (challenge) {
+            if (challenge.status === 'KEPT') {
+              throw new ForbiddenException(
+                'The active administrator elected to maintain their current session. Login request denied.',
+              );
+            }
+            if (challenge.status === 'ALLOWED' || challenge.expiresAt <= new Date()) {
+              // Allowed or 5 minutes expired -> proceed with superseding login
+              this.pendingChallenges.delete(dto.challengeId);
+            } else {
+              const remainingSec = Math.max(
+                0,
+                Math.round((challenge.expiresAt.getTime() - Date.now()) / 1000),
+              );
+              return {
+                duplicateDetected: true,
+                challengeId: challenge.id,
+                remainingSeconds: remainingSec,
+                expiresAt: challenge.expiresAt.toISOString(),
+                message:
+                  'A session is currently active. A security verification alert has been sent to the active dashboard. You have 5 minutes.',
+              };
+            }
+          }
+        } else {
+          // New duplicate login attempt -> initiate 5-minute challenge
+          const challengeId = randomUUID();
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+          const challenge: LoginChallenge = {
+            id: challengeId,
+            userId: user.id,
+            username: user.username,
+            expectedRole: user.role,
+            pcHostname: dto.pcHostname,
+            requestedAt: new Date(),
+            expiresAt,
+            status: 'PENDING',
+          };
+          this.pendingChallenges.set(challengeId, challenge);
+
+          // Create HIGH PRIORITY security violation
+          try {
+            const violation = await this.pcsService.logViolation(
+              dto.pcHostname || 'Remote Device',
+              null,
+              'DUPLICATE_ADMIN_LOGIN',
+              `Security Alert: New login attempt detected for active account "${user.username}" (${user.role}) from ${dto.pcHostname || 'Remote Device'}. 5-minute session response window active.`,
+              new Date().toISOString(),
+              'HIGH',
+              { id: user.id, username: user.username, name: user.name },
+            );
+
+            const socketServer = this.realtimeService.getServer();
+            if (socketServer) {
+              socketServer.emit('pc:violation', violation);
+              socketServer.emit('auth:duplicate-login-alert', {
+                challengeId,
+                userId: user.id,
+                username: user.username,
+                role: user.role,
+                pcHostname: dto.pcHostname || 'Remote Workstation',
+                requestedAt: challenge.requestedAt.toISOString(),
+                expiresAt: expiresAt.toISOString(),
+              });
+            }
+          } catch (err) {
+            this.logger.error('Failed to log duplicate admin login violation:', err);
+          }
+
+          return {
+            duplicateDetected: true,
+            challengeId,
+            remainingSeconds: 300,
+            expiresAt: expiresAt.toISOString(),
+            message:
+              'SECURITY ALERT: A session is already active for this administrative account. An authorization challenge has been dispatched to the active workstation (5 min window).',
+          };
+        }
+      }
+    }
+
     // Reset rate limit on successful authentication
     this.rateLimiter.reset(rateLimitKey);
 
@@ -112,15 +232,105 @@ export class AuthService {
       username: user.username,
     };
 
+    const accessToken = await this.jwt.signAsync(payload);
+
+    // Record or update active session
+    if (user.role === 'ADMIN' || user.role === 'TEACHER') {
+      this.activeStaffSessions.set(user.id, {
+        token: accessToken,
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        pcHostname: dto.pcHostname,
+        lastActive: new Date(),
+      });
+    }
+
     return {
-      accessToken: await this.jwt.signAsync(payload),
+      accessToken,
       user: {
         id: user.id,
         role: user.role,
         username: user.username,
+        name: user.name,
         regNumber: user.regNumber,
         classId: user.classId,
       },
+    };
+  }
+
+  async keepSession(userId: string, challengeId?: string) {
+    if (challengeId) {
+      const challenge = this.pendingChallenges.get(challengeId);
+      if (challenge && challenge.userId === userId) {
+        challenge.status = 'KEPT';
+        const socketServer = this.realtimeService.getServer();
+        if (socketServer) {
+          socketServer.emit('auth:challenge-resolved', {
+            challengeId,
+            status: 'KEPT',
+            message: 'The active user chose to keep their session.',
+          });
+        }
+      }
+    } else {
+      // Keep all challenges for this user
+      for (const [id, ch] of this.pendingChallenges.entries()) {
+        if (ch.userId === userId && ch.status === 'PENDING') {
+          ch.status = 'KEPT';
+          const socketServer = this.realtimeService.getServer();
+          if (socketServer) {
+            socketServer.emit('auth:challenge-resolved', {
+              challengeId: id,
+              status: 'KEPT',
+              message: 'The active user chose to keep their session.',
+            });
+          }
+        }
+      }
+    }
+
+    const session = this.activeStaffSessions.get(userId);
+    if (session) {
+      session.lastActive = new Date();
+    }
+
+    return { success: true, message: 'Active session maintained. Concurrent login attempt denied.' };
+  }
+
+  async checkChallengeStatus(challengeId: string) {
+    const challenge = this.pendingChallenges.get(challengeId);
+    if (!challenge) {
+      return { status: 'EXPIRED_OR_NOT_FOUND', allowed: false };
+    }
+
+    const now = new Date();
+    if (challenge.status === 'KEPT') {
+      return {
+        status: 'KEPT',
+        allowed: false,
+        message: 'The active administrator elected to maintain their current session.',
+      };
+    }
+
+    if (challenge.status === 'ALLOWED' || challenge.expiresAt <= now) {
+      return {
+        status: 'ALLOWED',
+        allowed: true,
+        message: 'Challenge response period expired without objection. New session authorized.',
+      };
+    }
+
+    const remainingSeconds = Math.max(
+      0,
+      Math.round((challenge.expiresAt.getTime() - now.getTime()) / 1000),
+    );
+
+    return {
+      status: 'PENDING',
+      allowed: false,
+      remainingSeconds,
+      expiresAt: challenge.expiresAt.toISOString(),
     };
   }
 

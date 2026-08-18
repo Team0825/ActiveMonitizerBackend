@@ -78,11 +78,15 @@ export class CbtService {
 
   async generateOneTimeCbtCode(adminId: string): Promise<{ cbtCode: string; code: string; expiresAt: Date }> {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let code = 'CBT-';
-    for (let i = 0; i < 6; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const genChunk = (len: number) => {
+      let chunk = '';
+      for (let i = 0; i < len; i++) {
+        chunk += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return chunk;
+    };
+    const code = `${genChunk(4)}-${genChunk(4)}-${genChunk(4)}`;
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minute expiry
 
     await this.prisma.cbtRegistrationCode.create({
       data: {
@@ -115,8 +119,14 @@ export class CbtService {
       );
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { username },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: { equals: username, mode: 'insensitive' } },
+          { id: username },
+          { email: { equals: username, mode: 'insensitive' } },
+        ],
+      },
     });
 
     const passwordHash = user?.passwordHash ?? '$2b$10$invalidsaltinvalidsaltinvalidsa';

@@ -22,6 +22,22 @@ export class AuthController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Post('keep-session')
+  @HttpCode(200)
+  async keepSession(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: { challengeId?: string },
+  ) {
+    return this.authService.keepSession(req.user.sub, dto.challengeId);
+  }
+
+  @Post('check-challenge')
+  @HttpCode(200)
+  async checkChallenge(@Body() dto: { challengeId: string }) {
+    return this.authService.checkChallengeStatus(dto.challengeId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post('change-password')
   @HttpCode(200)
   async changePassword(@Req() req: AuthenticatedRequest, @Body() dto: ChangePasswordDto) {

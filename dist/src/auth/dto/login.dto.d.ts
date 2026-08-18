@@ -4,4 +4,6 @@ export declare class LoginDto {
     expectedRole: 'STUDENT' | 'TEACHER' | 'ADMIN';
     sessionId?: string;
     pcHostname?: string;
+    forceLogin?: boolean;
+    challengeId?: string;
 }

@@ -29,4 +29,11 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   pcHostname?: string;
+
+  @IsOptional()
+  forceLogin?: boolean;
+
+  @IsOptional()
+  @IsString()
+  challengeId?: string;
 }
