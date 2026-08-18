@@ -23,20 +23,35 @@ let ChatbotController = class ChatbotController {
         this.chatbotService = chatbotService;
     }
     ask(req, dto) {
-        return this.chatbotService.ask(req.user.sub, dto);
+        const studentId = req.user?.sub || 'STUDENT';
+        return this.chatbotService.ask(studentId, dto);
+    }
+    guide(req, dto) {
+        const studentId = req.user?.sub || 'STUDENT';
+        return this.chatbotService.getGuidance(studentId, dto.question, dto.instruction);
     }
 };
 exports.ChatbotController = ChatbotController;
 __decorate([
-    (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60_000 } }),
+    (0, throttler_1.Throttle)({ default: { limit: 15, ttl: 60_000 } }),
     (0, common_1.Post)('ask'),
-    (0, roles_guard_1.Roles)('STUDENT'),
+    (0, roles_guard_1.Roles)('STUDENT', 'TEACHER', 'ADMIN'),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, ask_chatbot_dto_1.AskChatbotDto]),
     __metadata("design:returntype", void 0)
 ], ChatbotController.prototype, "ask", null);
+__decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 15, ttl: 60_000 } }),
+    (0, common_1.Post)('guide'),
+    (0, roles_guard_1.Roles)('STUDENT', 'TEACHER', 'ADMIN'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], ChatbotController.prototype, "guide", null);
 exports.ChatbotController = ChatbotController = __decorate([
     (0, common_1.Controller)('chatbot'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),

@@ -4,8 +4,14 @@ export type PcCommandAction =
   | 'FREEZE'
   | 'UNFREEZE'
   | 'SHUTDOWN'
+  | 'RESTART'
   | 'MESSAGE'
-  | 'CAPTURE';
+  | 'WARNING'
+  | 'CAPTURE'
+  | 'SIMULATION_START'
+  | 'SIMULATION_STOP'
+  | 'CHATBOT_ENABLE'
+  | 'CHATBOT_DISABLE';
 
 /*
  * ============================================================
@@ -203,8 +209,14 @@ export function assertTeacherCommandPayload(
       'FREEZE',
       'UNFREEZE',
       'SHUTDOWN',
+      'RESTART',
       'MESSAGE',
+      'WARNING',
       'CAPTURE',
+      'SIMULATION_START',
+      'SIMULATION_STOP',
+      'CHATBOT_ENABLE',
+      'CHATBOT_DISABLE',
     ];
 
   if (

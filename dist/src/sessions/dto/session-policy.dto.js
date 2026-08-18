@@ -53,6 +53,11 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
+], UpdateSessionPolicyDto.prototype, "allowAiAssistant", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
 ], UpdateSessionPolicyDto.prototype, "freezeOnEnd", void 0);
 __decorate([
     (0, class_validator_1.IsBoolean)(),

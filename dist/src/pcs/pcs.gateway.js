@@ -31,12 +31,68 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         this.sessionRealtimeService = sessionRealtimeService;
         this.logger = new common_1.Logger(PcsGateway_1.name);
         this.pendingCommands = new Map();
+        this.pcCommandQueues = new Map();
+        this.pcInFlightCommand = new Map();
         this.activeSpectators = new Map();
     }
     afterInit(server) {
         this.sessionRealtimeService
             .setServer(server);
         this.logger.log('Realtime gateway initialized.');
+    }
+    enqueuePcCommand(command) {
+        this.pendingCommands.set(command.commandId, command);
+        const target = command.targetHostname;
+        if (target === 'ALL') {
+            if (command.payload) {
+                this.server.emit('command:execute', command.payload);
+            }
+            return;
+        }
+        const queue = this.pcCommandQueues.get(target) || [];
+        queue.push(command);
+        this.pcCommandQueues.set(target, queue);
+        this.processNextCommandForPc(target);
+    }
+    processNextCommandForPc(hostname) {
+        if (this.pcInFlightCommand.has(hostname)) {
+            return;
+        }
+        const queue = this.pcCommandQueues.get(hostname);
+        if (!queue || queue.length === 0) {
+            return;
+        }
+        const nextCommand = queue.shift();
+        nextCommand.status = 'SENT';
+        this.pcInFlightCommand.set(hostname, nextCommand);
+        nextCommand.timeoutTimer = setTimeout(() => {
+            this.handleCommandTimeout(hostname, nextCommand.commandId);
+        }, 15000);
+        if (nextCommand.payload) {
+            this.server.to(`pc:${hostname}`).emit('command:execute', nextCommand.payload);
+        }
+    }
+    handleCommandTimeout(hostname, commandId) {
+        const currentInFlight = this.pcInFlightCommand.get(hostname);
+        if (currentInFlight && currentInFlight.commandId === commandId) {
+            currentInFlight.status = 'EXPIRED';
+            this.pcInFlightCommand.delete(hostname);
+            const timeoutResult = {
+                commandId,
+                hostname,
+                action: currentInFlight.action || 'LOCK',
+                success: false,
+                error: 'Command execution timed out after 15 seconds.',
+                executedAt: new Date().toISOString(),
+                latencyMs: 15000,
+            };
+            if (currentInFlight.sessionId && currentInFlight.sessionId !== 'DIRECT') {
+                this.server.to(`session:${currentInFlight.sessionId}`).emit('command:result', timeoutResult);
+            }
+            this.server.emit('command:result', timeoutResult);
+            this.logger.warn(`[COMMAND_TIMEOUT] Command ${commandId} (${currentInFlight.action}) timed out for ${hostname}. Unblocking queue.`);
+            this.processNextCommandForPc(hostname);
+        }
     }
     async handleConnection(client) {
         const auth = client.handshake.auth ?? {};
@@ -129,12 +185,12 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
                     select: { id: true, status: true, sessionCode: true },
                 });
                 if (activeSession && activeSession.status === 'ACTIVE') {
-                    const violationRecord = await this.pcsService.logViolation(hostname, activeSession.id, 'AGENT_STOPPED', `Workstation Agent unexpectedly terminated or lost connection during active session ${activeSession.sessionCode} on ${hostname}.`, new Date().toISOString(), 'CRITICAL');
+                    const violationRecord = await this.pcsService.logViolation(hostname, activeSession.id, 'AGENT_DISCONNECTED', `Workstation connection lost or PC restarted during active session ${activeSession.sessionCode} on ${hostname}. Marked for administrator review (Crash / Power loss).`, new Date().toISOString(), 'HIGH');
                     this.server
                         .to(`session:${pc.currentSessionId}`)
                         .emit('pc:violation', violationRecord);
                     this.server.emit('pc:violation', violationRecord);
-                    this.logger.warn(`[VIOLATION] AGENT_STOPPED recorded for ${hostname} in active session ${activeSession.sessionCode}`);
+                    this.logger.warn(`[DISCONNECT] AGENT_DISCONNECTED recorded for ${hostname} in active session ${activeSession.sessionCode} (pending teacher/admin review)`);
                 }
             }
             catch (err) {
@@ -734,7 +790,7 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
         }
         const issuedAt = new Date();
         const commandId = (0, crypto_1.randomUUID)();
-        const command = {
+        const commandPayload = {
             commandId,
             sessionId: 'DIRECT',
             action: payload.action,
@@ -744,19 +800,17 @@ let PcsGateway = PcsGateway_1 = class PcsGateway {
             issuedBy: user.sub,
             issuedAt: issuedAt.toISOString(),
         };
-        this.pendingCommands.set(commandId, {
+        const pendingCommand = {
             commandId,
             sessionId: 'DIRECT',
             issuedBy: user.sub,
             issuedAt: issuedAt.getTime(),
             targetHostname: payload.targetHostname,
-        });
-        if (payload.targetHostname === 'ALL') {
-            this.server.emit('command:execute', command);
-        }
-        else {
-            this.server.to(`pc:${payload.targetHostname}`).emit('command:execute', command);
-        }
+            action: payload.action,
+            status: 'PENDING',
+            payload: commandPayload,
+        };
+        this.enqueuePcCommand(pendingCommand);
         await this.pcsService.logCommand(user.sub, payload.action, payload.targetHostname, {
             commandId,
             isDirect: true,

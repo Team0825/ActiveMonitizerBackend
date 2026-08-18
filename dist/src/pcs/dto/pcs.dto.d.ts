@@ -1,4 +1,4 @@
-export type PcCommandAction = 'LOCK' | 'UNLOCK' | 'FREEZE' | 'UNFREEZE' | 'SHUTDOWN' | 'MESSAGE' | 'CAPTURE';
+export type PcCommandAction = 'LOCK' | 'UNLOCK' | 'FREEZE' | 'UNFREEZE' | 'SHUTDOWN' | 'RESTART' | 'MESSAGE' | 'WARNING' | 'CAPTURE' | 'SIMULATION_START' | 'SIMULATION_STOP' | 'CHATBOT_ENABLE' | 'CHATBOT_DISABLE';
 export interface RegisterPcPayload {
     hostname: string;
     labName?: string;

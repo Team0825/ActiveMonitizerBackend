@@ -4,10 +4,16 @@ import { AskChatbotDto } from './dto/ask-chatbot.dto';
 export declare class ChatbotService {
     private readonly config;
     private readonly prisma;
+    private readonly logger;
     private readonly apiKey;
     private readonly model;
+    private readonly baseUrl;
     constructor(config: ConfigService, prisma: PrismaService);
     ask(studentId: string, dto: AskChatbotDto): Promise<{
-        reply: any;
+        reply: string;
     }>;
+    getGuidance(studentId: string, question: string, instruction?: string): Promise<{
+        guidance: string;
+    }>;
+    private callAiProvider;
 }

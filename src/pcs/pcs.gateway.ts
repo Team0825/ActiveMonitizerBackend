@@ -95,9 +95,11 @@ interface PendingCommand {
   sessionId: string;
   issuedBy: string;
   issuedAt: number;
-  targetHostname:
-    | string
-    | 'ALL';
+  targetHostname: string | 'ALL';
+  action?: string;
+  status?: 'PENDING' | 'SENT' | 'ACKNOWLEDGED' | 'EXECUTING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+  payload?: PcExecuteCommandPayload;
+  timeoutTimer?: NodeJS.Timeout;
 }
 
 /*
@@ -128,17 +130,11 @@ export class PcsGateway
     );
 
   /*
-   * Temporary command tracker.
-   *
-   * Later, when multiple backend instances
-   * are deployed, this should move to Redis.
+   * Reliable per-PC sequential command queues & in-flight tracker.
    */
-
-  private readonly pendingCommands =
-    new Map<
-      string,
-      PendingCommand
-    >();
+  private readonly pendingCommands = new Map<string, PendingCommand>();
+  private readonly pcCommandQueues = new Map<string, PendingCommand[]>();
+  private readonly pcInFlightCommand = new Map<string, PendingCommand>();
 
   constructor(
     private readonly jwt:
@@ -177,6 +173,85 @@ export class PcsGateway
     this.logger.log(
       'Realtime gateway initialized.',
     );
+  }
+
+  /*
+   * ==========================================================
+   * RELIABLE COMMAND QUEUE ENGINE
+   * ==========================================================
+   */
+
+  private enqueuePcCommand(command: PendingCommand) {
+    this.pendingCommands.set(command.commandId, command);
+
+    const target = command.targetHostname;
+    if (target === 'ALL') {
+      // Broadcast commands are sent directly
+      if (command.payload) {
+        this.server.emit('command:execute', command.payload);
+      }
+      return;
+    }
+
+    const queue = this.pcCommandQueues.get(target) || [];
+    queue.push(command);
+    this.pcCommandQueues.set(target, queue);
+
+    this.processNextCommandForPc(target);
+  }
+
+  private processNextCommandForPc(hostname: string) {
+    if (this.pcInFlightCommand.has(hostname)) {
+      return; // Agent is busy executing current command
+    }
+
+    const queue = this.pcCommandQueues.get(hostname);
+    if (!queue || queue.length === 0) {
+      return;
+    }
+
+    const nextCommand = queue.shift()!;
+    nextCommand.status = 'SENT';
+    this.pcInFlightCommand.set(hostname, nextCommand);
+
+    // 15-second command timeout safeguard
+    nextCommand.timeoutTimer = setTimeout(() => {
+      this.handleCommandTimeout(hostname, nextCommand.commandId);
+    }, 15000);
+
+    if (nextCommand.payload) {
+      this.server.to(`pc:${hostname}`).emit('command:execute', nextCommand.payload);
+    }
+  }
+
+  private handleCommandTimeout(hostname: string, commandId: string) {
+    const currentInFlight = this.pcInFlightCommand.get(hostname);
+    if (currentInFlight && currentInFlight.commandId === commandId) {
+      currentInFlight.status = 'EXPIRED';
+      this.pcInFlightCommand.delete(hostname);
+
+      const timeoutResult: PcCommandResultPayload = {
+        commandId,
+        hostname,
+        action: (currentInFlight.action as any) || 'LOCK',
+        success: false,
+        error: 'Command execution timed out after 15 seconds.',
+        executedAt: new Date().toISOString(),
+        latencyMs: 15000,
+      };
+
+      if (currentInFlight.sessionId && currentInFlight.sessionId !== 'DIRECT') {
+        this.server.to(`session:${currentInFlight.sessionId}`).emit('command:result', timeoutResult);
+      }
+      this.server.emit('command:result', timeoutResult);
+
+      this.logger.warn(
+        `[COMMAND_TIMEOUT] Command ${commandId} (${currentInFlight.action}) timed out for ${hostname}. Unblocking queue.`,
+      );
+
+      // Process next queued command for this PC
+      this.processNextCommandForPc(hostname);
+    }
   }
 
   /*
@@ -384,10 +459,10 @@ return;
           const violationRecord = await this.pcsService.logViolation(
             hostname,
             activeSession.id,
-            'AGENT_STOPPED',
-            `Workstation Agent unexpectedly terminated or lost connection during active session ${activeSession.sessionCode} on ${hostname}.`,
+            'AGENT_DISCONNECTED',
+            `Workstation connection lost or PC restarted during active session ${activeSession.sessionCode} on ${hostname}. Marked for administrator review (Crash / Power loss).`,
             new Date().toISOString(),
-            'CRITICAL',
+            'HIGH',
           );
 
           this.server
@@ -397,7 +472,7 @@ return;
           this.server.emit('pc:violation', violationRecord);
 
           this.logger.warn(
-            `[VIOLATION] AGENT_STOPPED recorded for ${hostname} in active session ${activeSession.sessionCode}`,
+            `[DISCONNECT] AGENT_DISCONNECTED recorded for ${hostname} in active session ${activeSession.sessionCode} (pending teacher/admin review)`,
           );
         }
       } catch (err) {
@@ -1784,7 +1859,7 @@ async handleSystemInfo(
 
     const issuedAt = new Date();
     const commandId = randomUUID();
-    const command: PcExecuteCommandPayload = {
+    const commandPayload: PcExecuteCommandPayload = {
       commandId,
       sessionId: 'DIRECT',
       action: payload.action,
@@ -1795,19 +1870,18 @@ async handleSystemInfo(
       issuedAt: issuedAt.toISOString(),
     };
 
-    this.pendingCommands.set(commandId, {
+    const pendingCommand: PendingCommand = {
       commandId,
       sessionId: 'DIRECT',
       issuedBy: user.sub,
       issuedAt: issuedAt.getTime(),
       targetHostname: payload.targetHostname,
-    });
+      action: payload.action,
+      status: 'PENDING',
+      payload: commandPayload,
+    };
 
-    if (payload.targetHostname === 'ALL') {
-      this.server.emit('command:execute', command);
-    } else {
-      this.server.to(`pc:${payload.targetHostname}`).emit('command:execute', command);
-    }
+    this.enqueuePcCommand(pendingCommand);
 
     await this.pcsService.logCommand(user.sub, payload.action, payload.targetHostname, {
       commandId,
@@ -1816,4 +1890,3 @@ async handleSystemInfo(
     });
   }
 }
-

@@ -68,6 +68,10 @@ export class CreateSessionDto {
 
   @IsBoolean()
   @IsOptional()
+  allowAiAssistant?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
   allowOffline?: boolean;
 
   @IsString()
@@ -203,4 +207,29 @@ export class HandleAccessRequestDto {
 
   @IsBoolean()
   approve: boolean;
+}
+
+export class GenerateRecoveryCodeDto {
+  @IsString()
+  sessionId: string;
+
+  @IsString()
+  studentIdOrReg: string;
+
+  @IsString()
+  @IsOptional()
+  hostname?: string;
+
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
+
+export class ValidateRecoveryCodeDto {
+  @IsString()
+  recoveryCode: string;
+
+  @IsString()
+  @IsOptional()
+  pcHostname?: string;
 }

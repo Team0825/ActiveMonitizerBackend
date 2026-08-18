@@ -1823,4 +1823,135 @@ export class CbtService {
       passPercentage: Math.round((passCount / totalSubmissions) * 10000) / 100,
     };
   }
+
+  /*
+   * ==========================================================
+   * 7. OFFLINE CBT PRE-EXAM SYNCHRONIZATION
+   * ==========================================================
+   */
+
+  async syncOfflinePackage(studentId: string, examIdOrCode: string, pcHostname: string) {
+    const trimmedTarget = (examIdOrCode || '').trim();
+    if (!trimmedTarget) {
+      throw new BadRequestException('Exam ID or CBT Code is required for offline synchronization');
+    }
+
+    const exam = await this.prisma.exam.findFirst({
+      where: {
+        OR: [{ id: trimmedTarget }, { cbtCode: trimmedTarget.toUpperCase() }],
+      },
+      include: {
+        questionPaper: {
+          include: {
+            questions: {
+              orderBy: { orderIndex: 'asc' },
+            },
+          },
+        },
+        session: {
+          include: {
+            allowedWebsites: true,
+            blockedWebsites: true,
+            allowedApplications: true,
+            blockedApplications: true,
+          },
+        },
+      },
+    });
+
+    if (!exam) {
+      throw new NotFoundException('Exam not found for offline synchronization');
+    }
+
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true, name: true, username: true, regNumber: true, rollNumber: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student account not found');
+    }
+
+    const durationMinutes = exam.durationMinutes || exam.session?.durationMinutes || 60;
+    const synchronizedAt = new Date().toISOString();
+    const validUntil = new Date(Date.now() + (durationMinutes + 45) * 60 * 1000).toISOString();
+
+    const sanitizedQuestions = (exam.questionPaper?.questions || []).map((q) => {
+      let parsedOptions: any[] = [];
+      try {
+        parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+      } catch {
+        parsedOptions = [];
+      }
+
+      return {
+        id: q.id,
+        text: q.questionText,
+        type: q.questionType,
+        options: parsedOptions,
+        marks: q.marks,
+        orderIndex: q.orderIndex,
+      };
+    });
+
+    const offlinePayload = {
+      syncVersion: '1.0.0',
+      synchronizedAt,
+      validUntil,
+      pcHostname: pcHostname || 'UNKNOWN-PC',
+      student: {
+        id: student.id,
+        name: student.name || student.username,
+        username: student.username,
+        regNumber: student.regNumber || student.rollNumber || student.username,
+      },
+      exam: {
+        id: exam.id,
+        title: exam.title,
+        cbtCode: exam.cbtCode,
+        durationMinutes,
+        totalMarks: exam.totalMarks,
+        passingMarks: exam.passingMarks,
+        instructions: exam.instructions || exam.session?.instructions,
+        questionPaperTitle: exam.questionPaper?.title,
+        questions: sanitizedQuestions,
+      },
+      policy: {
+        allowInternet: exam.session?.allowInternet ?? false,
+        allowClipboard: exam.session?.allowClipboard ?? false,
+        allowUsb: exam.session?.allowUsb ?? false,
+        allowTaskManager: exam.session?.allowTaskManager ?? false,
+        allowAltTab: exam.session?.allowAltTab ?? false,
+        allowWindowsKey: exam.session?.allowWindowsKey ?? false,
+        allowPrintScreen: exam.session?.allowPrintScreen ?? false,
+        freezeOnEnd: exam.session?.freezeOnEnd ?? true,
+        allowedWebsites: (exam.session?.allowedWebsites || []).map((w) => w.domain),
+        blockedWebsites: (exam.session?.blockedWebsites || []).map((w) => w.domain),
+        allowedApplications: (exam.session?.allowedApplications || []).map((a) => a.processName),
+        blockedApplications: (exam.session?.blockedApplications || []).map((a) => a.processName),
+        restrictExistingFiles: exam.session?.restrictExistingFiles ?? true,
+        restrictUnauthorizedApps: exam.session?.restrictUnauthorizedApps ?? true,
+      },
+    };
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: student.id,
+          action: 'OFFLINE_CBT_SYNC',
+          targetPc: pcHostname || 'UNKNOWN-PC',
+          metadata: JSON.stringify({
+            examId: exam.id,
+            cbtCode: exam.cbtCode,
+            synchronizedAt,
+            validUntil,
+          }),
+        },
+      });
+    } catch {
+      // Non-blocking audit log
+    }
+
+    return offlinePayload;
+  }
 }

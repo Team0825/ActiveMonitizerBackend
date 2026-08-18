@@ -99,6 +99,15 @@ export class StudentSessionController {
     return this.sessionsService
       .studentLogin(dto);
   }
+
+  @Post('recovery-login')
+  recoveryLogin(
+    @Body()
+    dto: { recoveryCode: string; pcHostname?: string },
+  ) {
+    return this.sessionsService
+      .validateRecoveryCode(dto);
+  }
 }
 
 /*
@@ -423,4 +432,16 @@ export class SessionsController {
     );
   }
 
+  @Post('generate-recovery-code')
+  @Roles('TEACHER', 'ADMIN')
+  generateRecoveryCode(
+    @Req() req: TeacherAdminRequest,
+    @Body() dto: { sessionId: string; studentIdOrReg: string; hostname?: string; reason?: string },
+  ) {
+    return this.sessionsService.generateRecoveryCode(
+      req.user.sub,
+      req.user.role,
+      dto,
+    );
+  }
 }

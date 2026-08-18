@@ -3,13 +3,19 @@ import { JwtPayload } from '../auth/jwt.strategy';
 import { ChatbotService } from './chatbot.service';
 import { AskChatbotDto } from './dto/ask-chatbot.dto';
 type AuthenticatedRequest = Request & {
-    user: JwtPayload;
+    user?: JwtPayload;
 };
 export declare class ChatbotController {
     private readonly chatbotService;
     constructor(chatbotService: ChatbotService);
     ask(req: AuthenticatedRequest, dto: AskChatbotDto): Promise<{
-        reply: any;
+        reply: string;
+    }>;
+    guide(req: AuthenticatedRequest, dto: {
+        question: string;
+        instruction?: string;
+    }): Promise<{
+        guidance: string;
     }>;
 }
 export {};

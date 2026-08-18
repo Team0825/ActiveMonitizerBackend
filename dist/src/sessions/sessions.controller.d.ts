@@ -89,6 +89,61 @@ export declare class StudentSessionController {
         requiresSpecialAccess?: undefined;
         accessRequest?: undefined;
     }>;
+    recoveryLogin(dto: {
+        recoveryCode: string;
+        pcHostname?: string;
+    }): Promise<{
+        token: string;
+        user: {
+            id: string;
+            name: string;
+            username: string;
+            role: string;
+            regNumber: string | null;
+        };
+        session: {
+            id: string;
+            sessionCode: string;
+            classTitle: string;
+            durationMinutes: number;
+            status: string;
+        };
+        policy: {
+            id: string;
+            sessionId: string;
+            sessionCode: string;
+            classTitle: string;
+            allowInternet: boolean;
+            allowClipboard: boolean;
+            allowUsb: boolean;
+            allowTaskManager: boolean;
+            allowAltTab: boolean;
+            allowWindowsKey: boolean;
+            allowPrintScreen: boolean;
+            allowOffline: boolean;
+            connectivityMode: string;
+            websiteAccessMode: string;
+            restrictExistingFiles: boolean;
+            restrictUnauthorizedApps: boolean;
+            activityMonitoring: boolean;
+            activityUpdateInterval: number;
+            activitySensitivity: string;
+            idleThresholdSeconds: number;
+            violationSensitivity: string;
+            freezeOnEnd: boolean;
+            warningMinutes: number;
+            screenshotInterval: number | null;
+            sessionMode: string;
+            questionMode: string;
+            instructions: string | null;
+            startupUrl: string | null;
+            allowedWebsites: string[];
+            blockedWebsites: string[];
+            allowedApplications: string[];
+            blockedApplications: string[];
+        };
+        isRecoveredSession: boolean;
+    }>;
 }
 export declare class SessionsController {
     private readonly sessionsService;
@@ -438,6 +493,22 @@ export declare class SessionsController {
         blockedWebsites: string[];
         allowedApplications: string[];
         blockedApplications: string[];
+    }>;
+    generateRecoveryCode(req: TeacherAdminRequest, dto: {
+        sessionId: string;
+        studentIdOrReg: string;
+        hostname?: string;
+        reason?: string;
+    }): Promise<{
+        success: boolean;
+        recoveryCode: string;
+        sessionId: string;
+        sessionCode: string;
+        studentId: string;
+        studentName: string;
+        regNumber: string;
+        expiresAt: string;
+        expiresInMinutes: number;
     }>;
 }
 export {};

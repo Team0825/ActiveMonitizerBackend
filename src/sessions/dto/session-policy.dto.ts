@@ -39,6 +39,10 @@ export class UpdateSessionPolicyDto {
 
   @IsBoolean()
   @IsOptional()
+  allowAiAssistant?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
   freezeOnEnd?: boolean;
 
   @IsBoolean()

@@ -26,6 +26,10 @@ let StudentSessionController = class StudentSessionController {
         return this.sessionsService
             .studentLogin(dto);
     }
+    recoveryLogin(dto) {
+        return this.sessionsService
+            .validateRecoveryCode(dto);
+    }
 };
 exports.StudentSessionController = StudentSessionController;
 __decorate([
@@ -35,6 +39,13 @@ __decorate([
     __metadata("design:paramtypes", [session_dto_1.JoinSessionDto]),
     __metadata("design:returntype", void 0)
 ], StudentSessionController.prototype, "studentLogin", null);
+__decorate([
+    (0, common_1.Post)('recovery-login'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], StudentSessionController.prototype, "recoveryLogin", null);
 exports.StudentSessionController = StudentSessionController = __decorate([
     (0, common_1.Controller)('sessions/student'),
     __metadata("design:paramtypes", [sessions_service_1.SessionsService])
@@ -79,6 +90,9 @@ let SessionsController = class SessionsController {
     }
     updateSessionPolicy(id, dto) {
         return this.sessionsService.updateSessionPolicy(id, dto);
+    }
+    generateRecoveryCode(req, dto) {
+        return this.sessionsService.generateRecoveryCode(req.user.sub, req.user.role, dto);
     }
 };
 exports.SessionsController = SessionsController;
@@ -169,6 +183,15 @@ __decorate([
     __metadata("design:paramtypes", [String, session_policy_dto_1.UpdateSessionPolicyDto]),
     __metadata("design:returntype", void 0)
 ], SessionsController.prototype, "updateSessionPolicy", null);
+__decorate([
+    (0, common_1.Post)('generate-recovery-code'),
+    (0, roles_guard_1.Roles)('TEACHER', 'ADMIN'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], SessionsController.prototype, "generateRecoveryCode", null);
 exports.SessionsController = SessionsController = __decorate([
     (0, common_1.Controller)('sessions'),
     (0, common_1.UseGuards)(roles_guard_1.RolesGuard),

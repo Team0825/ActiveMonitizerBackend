@@ -25,8 +25,14 @@ function assertTeacherCommandPayload(p) {
         'FREEZE',
         'UNFREEZE',
         'SHUTDOWN',
+        'RESTART',
         'MESSAGE',
+        'WARNING',
         'CAPTURE',
+        'SIMULATION_START',
+        'SIMULATION_STOP',
+        'CHATBOT_ENABLE',
+        'CHATBOT_DISABLE',
     ];
     if (!validActions.includes(p.action)) {
         throw new Error(`action must be one of ${validActions.join(', ')}`);

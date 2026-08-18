@@ -27,8 +27,13 @@ export declare class PcsGateway implements OnGatewayInit, OnGatewayConnection, O
     server: Server;
     private readonly logger;
     private readonly pendingCommands;
+    private readonly pcCommandQueues;
+    private readonly pcInFlightCommand;
     constructor(jwt: JwtService, prisma: PrismaService, pcsService: PcsService, sessionRealtimeService: SessionRealtimeService);
     afterInit(server: Server): void;
+    private enqueuePcCommand;
+    private processNextCommandForPc;
+    private handleCommandTimeout;
     handleConnection(client: AuthedSocket): Promise<void>;
     handleDisconnect(client: AuthedSocket): Promise<void>;
     onRegisterPc(client: AuthedSocket, payload: RegisterPcPayload): Promise<void>;

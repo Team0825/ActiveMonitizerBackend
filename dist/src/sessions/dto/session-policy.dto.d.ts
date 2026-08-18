@@ -6,6 +6,7 @@ export declare class UpdateSessionPolicyDto {
     allowAltTab?: boolean;
     allowWindowsKey?: boolean;
     allowPrintScreen?: boolean;
+    allowAiAssistant?: boolean;
     freezeOnEnd?: boolean;
     allowOffline?: boolean;
     connectivityMode?: 'ONLINE_ONLY' | 'OFFLINE_ONLY' | 'HYBRID';

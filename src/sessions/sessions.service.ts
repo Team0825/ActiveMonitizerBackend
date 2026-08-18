@@ -33,10 +33,26 @@ import {
 import { UpdateSessionPolicyDto } from './dto/session-policy.dto';
 import { RateLimiterService } from '../common/rate-limiter.service';
 import { PcsService } from '../pcs/pcs.service';
+import { randomUUID } from 'crypto';
+
+interface SessionRecoveryRecord {
+  code: string;
+  sessionId: string;
+  sessionCode: string;
+  studentId: string;
+  studentName: string;
+  regNumber: string;
+  hostname?: string;
+  issuerId: string;
+  issuedAt: number;
+  expiresAt: number;
+  used: boolean;
+}
 
 @Injectable()
 export class SessionsService {
   private readonly logger = new Logger(SessionsService.name);
+  private readonly recoveryCodes = new Map<string, SessionRecoveryRecord>();
 
   constructor(
     private readonly prisma:
@@ -2174,4 +2190,198 @@ async updateSessionPolicy(
 
   return updatedPolicy;
 }
+
+  /*
+   * ==========================================================
+   * CRASH RECOVERY / REJOIN CODE GENERATION & VALIDATION
+   * ==========================================================
+   */
+
+  async generateRecoveryCode(
+    issuerId: string,
+    role: string,
+    dto: { sessionId: string; studentIdOrReg: string; hostname?: string; reason?: string },
+  ) {
+    const session = await this.prisma.classSession.findFirst({
+      where: {
+        OR: [{ id: dto.sessionId }, { sessionCode: dto.sessionId.toUpperCase() }],
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (role !== 'ADMIN' && session.teacherId !== issuerId) {
+      throw new ForbiddenException('You are not authorized to issue recovery codes for this session');
+    }
+
+    // Find student by ID or Reg Number
+    const student = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: dto.studentIdOrReg },
+          { regNumber: dto.studentIdOrReg.trim().toUpperCase() },
+          { rollNumber: dto.studentIdOrReg.trim().toUpperCase() },
+          { username: dto.studentIdOrReg.trim().toUpperCase() },
+        ],
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException(`Student record not found for "${dto.studentIdOrReg}"`);
+    }
+
+    // Generate random 8-character secure recovery code
+    const rawCode = randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase();
+    const recoveryCode = `REC-${rawCode}`;
+    const issuedAt = Date.now();
+    const expiresAt = issuedAt + 30 * 60 * 1000; // 30 minutes expiration
+
+    const record: SessionRecoveryRecord = {
+      code: recoveryCode,
+      sessionId: session.id,
+      sessionCode: session.sessionCode,
+      studentId: student.id,
+      studentName: student.name || student.username,
+      regNumber: student.regNumber || student.rollNumber || student.username,
+      hostname: dto.hostname,
+      issuerId,
+      issuedAt,
+      expiresAt,
+      used: false,
+    };
+
+    this.recoveryCodes.set(recoveryCode, record);
+
+    // Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: issuerId,
+        action: 'RECOVERY_CODE_ISSUED',
+        targetPc: dto.hostname || 'UNKNOWN',
+        metadata: JSON.stringify({
+          recoveryCode,
+          sessionId: session.id,
+          sessionCode: session.sessionCode,
+          studentId: student.id,
+          studentName: student.name || student.username,
+          expiresAt: new Date(expiresAt).toISOString(),
+          reason: dto.reason || 'Crash recovery / power loss reconnection authorized',
+        }),
+      },
+    });
+
+    return {
+      success: true,
+      recoveryCode,
+      sessionId: session.id,
+      sessionCode: session.sessionCode,
+      studentId: student.id,
+      studentName: student.name || student.username,
+      regNumber: student.regNumber || student.rollNumber || student.username,
+      expiresAt: new Date(expiresAt).toISOString(),
+      expiresInMinutes: 30,
+    };
+  }
+
+  async validateRecoveryCode(dto: { recoveryCode: string; pcHostname?: string }) {
+    const code = (dto.recoveryCode || '').trim().toUpperCase();
+    if (!code) {
+      throw new BadRequestException('Recovery code is required');
+    }
+
+    const record = this.recoveryCodes.get(code);
+    if (!record) {
+      throw new NotFoundException('Invalid or expired recovery code. Please contact your instructor.');
+    }
+
+    if (record.used) {
+      throw new BadRequestException('This recovery code has already been used.');
+    }
+
+    if (Date.now() > record.expiresAt) {
+      this.recoveryCodes.delete(code);
+      throw new BadRequestException('Recovery code has expired. Please request a new code.');
+    }
+
+    const session = await this.prisma.classSession.findUnique({
+      where: { id: record.sessionId },
+    });
+
+    if (!session || session.status === 'ENDED' || session.status === 'CANCELLED') {
+      throw new BadRequestException('The associated session has already ended.');
+    }
+
+    const student = await this.prisma.user.findUnique({
+      where: { id: record.studentId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student account not found.');
+    }
+
+    // Mark recovery code as used
+    record.used = true;
+
+    // Generate authenticated JWT for student
+    const token = this.jwt.sign({
+      sub: student.id,
+      username: student.username,
+      role: 'STUDENT',
+      regNumber: student.regNumber || student.rollNumber,
+      sessionId: session.id,
+    });
+
+    // Update PC allocation if hostname was provided
+    if (dto.pcHostname) {
+      try {
+        await this.pcsService.markOnline(
+          dto.pcHostname,
+          undefined,
+          session.id,
+          student.id,
+        );
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    const policy = await this.getSessionPolicy(session.id);
+
+    // Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: student.id,
+        action: 'RECOVERY_LOGIN_SUCCESS',
+        targetPc: dto.pcHostname || record.hostname || 'UNKNOWN',
+        metadata: JSON.stringify({
+          recoveryCode: code,
+          sessionId: session.id,
+          sessionCode: session.sessionCode,
+          hostname: dto.pcHostname || record.hostname,
+        }),
+      },
+    });
+
+    return {
+      token,
+      user: {
+        id: student.id,
+        name: student.name || student.username,
+        username: student.username,
+        role: 'STUDENT',
+        regNumber: student.regNumber || student.rollNumber,
+      },
+      session: {
+        id: session.id,
+        sessionCode: session.sessionCode,
+        classTitle: session.classTitle,
+        durationMinutes: session.durationMinutes,
+        status: session.status,
+      },
+      policy,
+      isRecoveredSession: true,
+    };
+  }
 }

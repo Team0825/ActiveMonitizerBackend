@@ -10,6 +10,7 @@ export declare class CreateSessionDto {
     allowAltTab?: boolean;
     allowWindowsKey?: boolean;
     allowPrintScreen?: boolean;
+    allowAiAssistant?: boolean;
     allowOffline?: boolean;
     connectivityMode?: 'ONLINE_ONLY' | 'OFFLINE_ONLY' | 'HYBRID';
     websiteAccessMode?: 'NORMAL' | 'ALLOWED_ONLY' | 'BLOCKED';
@@ -42,4 +43,14 @@ export declare class RequestSpecialAccessDto {
 export declare class HandleAccessRequestDto {
     requestId: string;
     approve: boolean;
+}
+export declare class GenerateRecoveryCodeDto {
+    sessionId: string;
+    studentIdOrReg: string;
+    hostname?: string;
+    reason?: string;
+}
+export declare class ValidateRecoveryCodeDto {
+    recoveryCode: string;
+    pcHostname?: string;
 }

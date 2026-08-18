@@ -362,4 +362,17 @@ export class CbtController {
   ) {
     return this.cbtService.generateResults(examId, dto);
   }
+
+  @Post('offline-sync')
+  @Roles('STUDENT', 'ADMIN', 'TEACHER')
+  offlineSync(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: { examId: string; pcHostname?: string },
+  ) {
+    return this.cbtService.syncOfflinePackage(
+      req.user.sub,
+      dto.examId,
+      dto.pcHostname || '',
+    );
+  }
 }
