@@ -90,20 +90,36 @@ export class LicensingService {
       status: finalStatus,
       licenseNumber: license.licenseNumber,
       activationKey: license.activationKey,
-      institution: license.institution ? {
-        id: license.institution.id,
-        name: license.institution.name,
-        code: license.institution.code,
-        board: license.institution.board,
-        location: license.institution.location,
-        logoUrl: license.institution.logoUrl,
-      } : null,
+      activationKeyMasked: license.activationKey
+        ? `ACT-••••-••••-${license.activationKey.slice(-4)}`
+        : null,
+      activationKeyFull: license.activationKey,
+      institutionId: license.institution?.id || null,
+      institutionName: license.institution?.name || null,
+      institutionCode: license.institution?.code || null,
+      institutionBoard: license.institution?.board || null,
+      institutionLocation: license.institution?.location || null,
+      institutionLogoUrl: license.institution?.logoUrl || null,
+      institution: license.institution
+        ? {
+            id: license.institution.id,
+            name: license.institution.name,
+            code: license.institution.code,
+            board: license.institution.board,
+            location: license.institution.location,
+            logoUrl: license.institution.logoUrl,
+          }
+        : null,
       machineFingerprint: license.machineFingerprint,
+      deviceName: license.machineName || 'Registered Machine',
       machineName: license.machineName || 'Registered Machine',
+      activatedAt: license.activatedAt ? license.activatedAt.toISOString() : null,
       activationDate: license.activatedAt ? license.activatedAt.toISOString() : null,
+      expiresAt: license.expiresAt ? license.expiresAt.toISOString() : null,
       expiryDate: license.expiresAt ? license.expiresAt.toISOString() : 'Never',
       licenseType: license.licenseType,
       maxPcs: license.maxPcs,
+      canDeactivate: true,
       serverStatus: 'CONNECTED',
     };
   }
@@ -249,16 +265,20 @@ export class LicensingService {
   /**
    * Super Admin: Deactivate / Reset machine binding
    */
-  async deactivate(licenseId: string, resetMachineBinding: boolean, user: any) {
+  async deactivate(identifier: string, resetMachineBinding: boolean, user: any) {
     if (!user?.isSuperAdmin && user?.role !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Only Super Admin can deactivate or reassign licenses.');
     }
 
-    const license = await this.prisma.license.findUnique({ where: { id: licenseId } });
+    const license = await this.prisma.license.findFirst({
+      where: {
+        OR: [{ id: identifier }, { licenseNumber: identifier }],
+      },
+    });
     if (!license) throw new NotFoundException('License not found.');
 
     return this.prisma.license.update({
-      where: { id: licenseId },
+      where: { id: license.id },
       data: {
         isActivated: false,
         status: resetMachineBinding ? 'ACTIVE' : 'INACTIVE',

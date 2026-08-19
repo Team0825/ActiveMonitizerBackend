@@ -4,6 +4,12 @@ export declare class AgentThemeController {
     constructor(agentThemeService: AgentThemeService);
     getActiveTheme(targetInterface?: string, institutionId?: string): Promise<{
         targetInterface: string;
+        institutionName: any;
+        institutionBoard: any;
+        institutionLocation: any;
+        logoUrl: any;
+        showInstituteBranding: any;
+        showPdfHeader: any;
         mainBubbleBgColor: any;
         secondaryPanelColor: any;
         borderColor: any;
@@ -14,7 +20,6 @@ export declare class AgentThemeController {
         buttonTextColor: any;
         organizationLogoUrl: any;
         id: string;
-        logoUrl: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
@@ -32,9 +37,6 @@ export declare class AgentThemeController {
         statusWarning: string;
         statusDanger: string;
         statusInfo: string;
-        institutionName: string | null;
-        institutionBoard: string | null;
-        institutionLocation: string | null;
         progressBarAppearance: string;
         opacity: number;
         cornerRadius: number;
@@ -50,6 +52,12 @@ export declare class AgentThemeController {
         defaultInformationalText: string;
     } | {
         targetInterface: string;
+        institutionName: any;
+        institutionBoard: any;
+        institutionLocation: any;
+        logoUrl: any;
+        showInstituteBranding: any;
+        showPdfHeader: any;
         mainBubbleBgColor: any;
         secondaryPanelColor: any;
         borderColor: any;
@@ -72,10 +80,6 @@ export declare class AgentThemeController {
         statusWarning: string;
         statusDanger: string;
         statusInfo: string;
-        logoUrl: string;
-        institutionName: string;
-        institutionBoard: string;
-        institutionLocation: string;
         id: string;
         isActive: boolean;
         createdAt: Date;

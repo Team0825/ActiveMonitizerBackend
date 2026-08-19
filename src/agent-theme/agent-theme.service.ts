@@ -74,16 +74,35 @@ export class AgentThemeService {
       });
     }
 
-    // 4. Return unified theme object combining AppTheme + legacy AgentTheme fields
+    // 4. Also fetch active institution if available
+    let activeInstitution = null;
+    try {
+      activeInstitution = await this.prisma.institution.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    } catch {}
+
     const base = theme || {
       targetInterface: cleanInterface,
       ...DEFAULT_THEME_VALUES,
     };
 
+    const instName = (theme as any)?.institutionName || activeInstitution?.name || (legacyAgentTheme as any)?.institutionName || DEFAULT_THEME_VALUES.institutionName;
+    const instBoard = (theme as any)?.institutionBoard || activeInstitution?.board || DEFAULT_THEME_VALUES.institutionBoard;
+    const instLoc = (theme as any)?.institutionLocation || activeInstitution?.location || DEFAULT_THEME_VALUES.institutionLocation;
+    const instLogo = (theme as any)?.logoUrl || activeInstitution?.logoUrl || legacyAgentTheme.organizationLogoUrl || '';
+
     return {
       ...legacyAgentTheme,
       ...base,
       targetInterface: cleanInterface,
+      institutionName: instName,
+      institutionBoard: instBoard,
+      institutionLocation: instLoc,
+      logoUrl: instLogo,
+      showInstituteBranding: (theme as any)?.showInstituteBranding !== undefined ? (theme as any).showInstituteBranding : true,
+      showPdfHeader: (theme as any)?.showPdfHeader !== undefined ? (theme as any).showPdfHeader : true,
       // Ensure compatibility fields for Agent Bubble
       mainBubbleBgColor: (theme as any)?.cardBackground || legacyAgentTheme.mainBubbleBgColor || '#1E293B',
       secondaryPanelColor: (theme as any)?.secondaryColor || legacyAgentTheme.secondaryPanelColor || '#0F172A',
@@ -93,7 +112,7 @@ export class AgentThemeService {
       mutedTextColor: (theme as any)?.mutedTextColor || legacyAgentTheme.mutedTextColor || '#94A3B8',
       buttonColor: (theme as any)?.buttonColor || legacyAgentTheme.buttonColor || '#334155',
       buttonTextColor: (theme as any)?.buttonTextColor || legacyAgentTheme.buttonTextColor || '#FFFFFF',
-      organizationLogoUrl: (theme as any)?.logoUrl || legacyAgentTheme.organizationLogoUrl || '',
+      organizationLogoUrl: instLogo,
     };
   }
 
@@ -130,7 +149,30 @@ export class AgentThemeService {
       this.logger.error('Failed to sync legacy AgentTheme:', err);
     }
 
-    // 2. Find or create AppTheme record
+    // 2. Sync to active Institution if name/logo/board/location provided
+    if (data.institutionName || data.logoUrl || data.institutionBoard || data.institutionLocation) {
+      try {
+        const inst = await this.prisma.institution.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (inst) {
+          await this.prisma.institution.update({
+            where: { id: inst.id },
+            data: {
+              name: data.institutionName || inst.name,
+              board: data.institutionBoard !== undefined ? data.institutionBoard : inst.board,
+              location: data.institutionLocation !== undefined ? data.institutionLocation : inst.location,
+              logoUrl: data.logoUrl !== undefined ? data.logoUrl : inst.logoUrl,
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn('Failed to sync institution table from theme update:', err);
+      }
+    }
+
+    // 3. Find or create AppTheme record
     let existingAppTheme = await this.prisma.appTheme.findFirst({
       where: {
         targetInterface,

@@ -73,14 +73,32 @@ let AgentThemeService = AgentThemeService_1 = class AgentThemeService {
                 },
             });
         }
+        let activeInstitution = null;
+        try {
+            activeInstitution = await this.prisma.institution.findFirst({
+                where: { isActive: true },
+                orderBy: { createdAt: 'asc' },
+            });
+        }
+        catch { }
         const base = theme || {
             targetInterface: cleanInterface,
             ...exports.DEFAULT_THEME_VALUES,
         };
+        const instName = theme?.institutionName || activeInstitution?.name || legacyAgentTheme?.institutionName || exports.DEFAULT_THEME_VALUES.institutionName;
+        const instBoard = theme?.institutionBoard || activeInstitution?.board || exports.DEFAULT_THEME_VALUES.institutionBoard;
+        const instLoc = theme?.institutionLocation || activeInstitution?.location || exports.DEFAULT_THEME_VALUES.institutionLocation;
+        const instLogo = theme?.logoUrl || activeInstitution?.logoUrl || legacyAgentTheme.organizationLogoUrl || '';
         return {
             ...legacyAgentTheme,
             ...base,
             targetInterface: cleanInterface,
+            institutionName: instName,
+            institutionBoard: instBoard,
+            institutionLocation: instLoc,
+            logoUrl: instLogo,
+            showInstituteBranding: theme?.showInstituteBranding !== undefined ? theme.showInstituteBranding : true,
+            showPdfHeader: theme?.showPdfHeader !== undefined ? theme.showPdfHeader : true,
             mainBubbleBgColor: theme?.cardBackground || legacyAgentTheme.mainBubbleBgColor || '#1E293B',
             secondaryPanelColor: theme?.secondaryColor || legacyAgentTheme.secondaryPanelColor || '#0F172A',
             borderColor: theme?.borderColor || legacyAgentTheme.borderColor || '#334155',
@@ -89,7 +107,7 @@ let AgentThemeService = AgentThemeService_1 = class AgentThemeService {
             mutedTextColor: theme?.mutedTextColor || legacyAgentTheme.mutedTextColor || '#94A3B8',
             buttonColor: theme?.buttonColor || legacyAgentTheme.buttonColor || '#334155',
             buttonTextColor: theme?.buttonTextColor || legacyAgentTheme.buttonTextColor || '#FFFFFF',
-            organizationLogoUrl: theme?.logoUrl || legacyAgentTheme.organizationLogoUrl || '',
+            organizationLogoUrl: instLogo,
         };
     }
     async updateActiveTheme(data) {
@@ -118,6 +136,28 @@ let AgentThemeService = AgentThemeService_1 = class AgentThemeService {
         }
         catch (err) {
             this.logger.error('Failed to sync legacy AgentTheme:', err);
+        }
+        if (data.institutionName || data.logoUrl || data.institutionBoard || data.institutionLocation) {
+            try {
+                const inst = await this.prisma.institution.findFirst({
+                    where: { isActive: true },
+                    orderBy: { createdAt: 'asc' },
+                });
+                if (inst) {
+                    await this.prisma.institution.update({
+                        where: { id: inst.id },
+                        data: {
+                            name: data.institutionName || inst.name,
+                            board: data.institutionBoard !== undefined ? data.institutionBoard : inst.board,
+                            location: data.institutionLocation !== undefined ? data.institutionLocation : inst.location,
+                            logoUrl: data.logoUrl !== undefined ? data.logoUrl : inst.logoUrl,
+                        },
+                    });
+                }
+            }
+            catch (err) {
+                this.logger.warn('Failed to sync institution table from theme update:', err);
+            }
         }
         let existingAppTheme = await this.prisma.appTheme.findFirst({
             where: {

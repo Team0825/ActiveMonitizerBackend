@@ -75,9 +75,10 @@ export class LicensingController {
   @UseGuards(JwtAuthGuard)
   @Post('deactivate')
   async deactivate(
-    @Body() body: { licenseId: string; resetMachineBinding?: boolean },
+    @Body() body: { licenseId?: string; licenseNumber?: string; resetMachineBinding?: boolean },
     @Req() req: any,
   ) {
-    return this.licensingService.deactivate(body.licenseId, !!body.resetMachineBinding, req.user);
+    const identifier = body.licenseId || body.licenseNumber;
+    return this.licensingService.deactivate(identifier || '', !!body.resetMachineBinding, req.user);
   }
 }

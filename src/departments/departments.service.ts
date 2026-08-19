@@ -107,11 +107,28 @@ export class DepartmentsService {
     });
   }
 
-  private async getDefaultInstitutionId(): Promise<string | undefined> {
-    const inst = await this.prisma.institution.findFirst({
+  private async getDefaultInstitutionId(): Promise<string> {
+    let inst = await this.prisma.institution.findFirst({
       where: { isActive: true },
       orderBy: { createdAt: 'asc' },
     });
-    return inst?.id;
+
+    if (!inst) {
+      try {
+        inst = await this.prisma.institution.create({
+          data: {
+            name: 'National Institute of Science & Technology',
+            code: 'NIST-MAIN',
+            board: 'Central Board of Secondary & Higher Education',
+            location: 'Main Campus, Academic Complex',
+            isActive: true,
+          },
+        });
+      } catch {
+        inst = await this.prisma.institution.findFirst();
+      }
+    }
+
+    return inst ? inst.id : '';
   }
 }
