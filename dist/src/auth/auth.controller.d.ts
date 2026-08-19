@@ -15,10 +15,17 @@ export declare class AuthController {
         remainingSeconds: number;
         expiresAt: string;
         message: string;
+        success?: undefined;
         accessToken?: undefined;
+        token?: undefined;
+        access_token?: undefined;
         user?: undefined;
     } | {
+        success: boolean;
         accessToken: string;
+        token: string;
+        access_token: string;
+        expiresAt: string;
         user: {
             id: string;
             role: "ADMIN" | "TEACHER" | "STUDENT";
@@ -30,6 +37,7 @@ export declare class AuthController {
             regNumber: string | null;
             classId: string | null;
             institutionId: string | null;
+            institutionName: string | null;
             institution: {
                 id: string;
                 name: string;
@@ -49,8 +57,11 @@ export declare class AuthController {
         duplicateDetected?: undefined;
         challengeId?: undefined;
         remainingSeconds?: undefined;
-        expiresAt?: undefined;
         message?: undefined;
+    }>;
+    logout(req: AuthenticatedRequest): Promise<{
+        success: boolean;
+        message: string;
     }>;
     keepSession(req: AuthenticatedRequest, dto: {
         challengeId?: string;

@@ -32,6 +32,7 @@ let AuthService = AuthService_1 = class AuthService {
     }
     async login(dto) {
         const cleanUsername = (dto.username || '').trim();
+        this.logger.log(`LOGIN_REQUEST: username=${cleanUsername}, expectedRole=${dto.expectedRole}`);
         const rateLimitKey = `auth-login:${cleanUsername.toLowerCase()}`;
         const limitStatus = this.rateLimiter.checkLimit(rateLimitKey);
         if (!limitStatus.allowed) {
@@ -149,6 +150,8 @@ let AuthService = AuthService_1 = class AuthService {
             }
         }
         this.rateLimiter.reset(rateLimitKey);
+        this.logger.log(`LOGIN_USER_FOUND: Authenticated userId=${user.id}, role=${user.role}, isSuperAdmin=${user.isSuperAdmin}`);
+        this.logger.log(`PASSWORD_VALIDATED: Validation successful for user ${user.username}`);
         await this.audit('LOGIN', user.id, dto);
         await this.prisma.user.update({
             where: { id: user.id },
@@ -169,6 +172,7 @@ let AuthService = AuthService_1 = class AuthService {
             institutionId: userWithDetails?.institutionId || null,
         };
         const accessToken = await this.jwt.signAsync(payload);
+        this.logger.log(`TOKEN_GENERATED: Issued auth token for userId=${user.id}`);
         if (user.role === 'ADMIN' || user.role === 'TEACHER') {
             this.activeStaffSessions.set(user.id, {
                 token: accessToken,
@@ -179,8 +183,14 @@ let AuthService = AuthService_1 = class AuthService {
                 lastActive: new Date(),
             });
         }
+        const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+        this.logger.log(`LOGIN_RESPONSE_SENT: Successfully returned token for ${user.username}`);
         return {
+            success: true,
             accessToken,
+            token: accessToken,
+            access_token: accessToken,
+            expiresAt,
             user: {
                 id: user.id,
                 role: user.role,
@@ -192,6 +202,7 @@ let AuthService = AuthService_1 = class AuthService {
                 regNumber: user.regNumber,
                 classId: user.classId,
                 institutionId: userWithDetails?.institutionId || null,
+                institutionName: userWithDetails?.institution?.name || null,
                 institution: userWithDetails?.institution ? {
                     id: userWithDetails.institution.id,
                     name: userWithDetails.institution.name,
@@ -209,6 +220,11 @@ let AuthService = AuthService_1 = class AuthService {
                 lastLoginAt: new Date().toISOString(),
             },
         };
+    }
+    async logout(userId) {
+        this.activeStaffSessions.delete(userId);
+        this.logger.log(`LOGOUT: Cleared active session for userId=${userId}`);
+        return { success: true, message: 'Logged out successfully' };
     }
     async getProfile(userId) {
         const user = await this.prisma.user.findUnique({

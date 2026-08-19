@@ -51,6 +51,7 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const cleanUsername = (dto.username || '').trim();
+    this.logger.log(`LOGIN_REQUEST: username=${cleanUsername}, expectedRole=${dto.expectedRole}`);
     const rateLimitKey = `auth-login:${cleanUsername.toLowerCase()}`;
 
     // 1. Check Rate Limit: 5 attempts per 2 hours
@@ -224,6 +225,9 @@ export class AuthService {
     // Reset rate limit on successful authentication
     this.rateLimiter.reset(rateLimitKey);
 
+    this.logger.log(`LOGIN_USER_FOUND: Authenticated userId=${user.id}, role=${user.role}, isSuperAdmin=${user.isSuperAdmin}`);
+    this.logger.log(`PASSWORD_VALIDATED: Validation successful for user ${user.username}`);
+
     await this.audit('LOGIN', user.id, dto);
 
     // Update lastLoginAt in database
@@ -249,6 +253,7 @@ export class AuthService {
     };
 
     const accessToken = await this.jwt.signAsync(payload);
+    this.logger.log(`TOKEN_GENERATED: Issued auth token for userId=${user.id}`);
 
     // Record or update active session
     if (user.role === 'ADMIN' || user.role === 'TEACHER') {
@@ -262,8 +267,15 @@ export class AuthService {
       });
     }
 
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+    this.logger.log(`LOGIN_RESPONSE_SENT: Successfully returned token for ${user.username}`);
+
     return {
+      success: true,
       accessToken,
+      token: accessToken,
+      access_token: accessToken,
+      expiresAt,
       user: {
         id: user.id,
         role: user.role,
@@ -275,6 +287,7 @@ export class AuthService {
         regNumber: user.regNumber,
         classId: user.classId,
         institutionId: userWithDetails?.institutionId || null,
+        institutionName: userWithDetails?.institution?.name || null,
         institution: userWithDetails?.institution ? {
           id: userWithDetails.institution.id,
           name: userWithDetails.institution.name,
@@ -292,6 +305,12 @@ export class AuthService {
         lastLoginAt: new Date().toISOString(),
       },
     };
+  }
+
+  async logout(userId: string) {
+    this.activeStaffSessions.delete(userId);
+    this.logger.log(`LOGOUT: Cleared active session for userId=${userId}`);
+    return { success: true, message: 'Logged out successfully' };
   }
 
   async getProfile(userId: string) {

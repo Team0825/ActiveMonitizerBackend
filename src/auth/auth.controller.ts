@@ -22,6 +22,13 @@ export class AuthController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Post('logout')
+  @HttpCode(200)
+  async logout(@Req() req: AuthenticatedRequest) {
+    return this.authService.logout(req.user.sub);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post('keep-session')
   @HttpCode(200)
   async keepSession(
