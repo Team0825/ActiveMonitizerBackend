@@ -1151,6 +1151,31 @@ async getHealth() {
       }
     }
 
+    // Fallback: check recent active SessionParticipant for this workstation
+    if (!session || !student) {
+      const recentParticipant = await this.prisma.sessionParticipant.findFirst({
+        where: { pcHostname: trimmedHost },
+        orderBy: { joinedAt: 'desc' },
+        include: {
+          session: { select: { id: true, sessionCode: true, classTitle: true } },
+          student: { select: { id: true, name: true, username: true, regNumber: true, rollNumber: true } },
+        },
+      });
+
+      if (!session && recentParticipant?.session) {
+        session = recentParticipant.session;
+      }
+
+      if (!student && recentParticipant?.student) {
+        student = {
+          id: recentParticipant.student.id,
+          name: recentParticipant.student.name || recentParticipant.student.username,
+          username: recentParticipant.student.username,
+          regNumber: recentParticipant.student.regNumber || recentParticipant.student.rollNumber,
+        };
+      }
+    }
+
     const normType = (type || 'AGENT_TAMPER').toUpperCase();
     let computedSeverity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' = explicitSeverity || 'MEDIUM';
 

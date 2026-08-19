@@ -404,13 +404,19 @@ let SessionsService = SessionsService_1 = class SessionsService {
             },
         });
         if (dto.pcHostname?.trim()) {
-            await this.prisma.pc
-                .updateMany({
-                where: {
-                    hostname: dto.pcHostname
-                        .trim(),
+            const host = dto.pcHostname.trim();
+            await this.prisma.pc.upsert({
+                where: { hostname: host },
+                create: {
+                    hostname: host,
+                    displayName: host,
+                    labName: 'DEFAULT-LAB',
+                    status: 'ONLINE',
+                    currentSessionId: session.id,
+                    currentStudentId: studentId,
+                    lastSeen: new Date(),
                 },
-                data: {
+                update: {
                     status: 'ONLINE',
                     currentSessionId: session.id,
                     currentStudentId: studentId,

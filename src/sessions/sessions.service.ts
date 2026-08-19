@@ -904,31 +904,26 @@ export class SessionsService {
           },
         });
 
-    if (
-      dto.pcHostname?.trim()
-    ) {
-      await this.prisma.pc
-        .updateMany({
-          where: {
-            hostname:
-              dto.pcHostname
-                .trim(),
-          },
-
-          data: {
-            status:
-              'ONLINE',
-
-            currentSessionId:
-              session.id,
-
-            currentStudentId:
-              studentId,
-
-            lastSeen:
-              new Date(),
-          },
-        });
+    if (dto.pcHostname?.trim()) {
+      const host = dto.pcHostname.trim();
+      await this.prisma.pc.upsert({
+        where: { hostname: host },
+        create: {
+          hostname: host,
+          displayName: host,
+          labName: 'DEFAULT-LAB',
+          status: 'ONLINE',
+          currentSessionId: session.id,
+          currentStudentId: studentId,
+          lastSeen: new Date(),
+        },
+        update: {
+          status: 'ONLINE',
+          currentSessionId: session.id,
+          currentStudentId: studentId,
+          lastSeen: new Date(),
+        },
+      });
     }
 
     /*

@@ -119,22 +119,47 @@ export class CbtService {
       );
     }
 
-    const user = await this.prisma.user.findFirst({
+    // Find user by exact match, case-insensitive match, or ID
+    const users = await this.prisma.user.findMany({
       where: {
         OR: [
-          { username: { equals: username, mode: 'insensitive' } },
+          { username: username },
+          { email: username },
           { id: username },
-          { email: { equals: username, mode: 'insensitive' } },
         ],
       },
     });
 
+    // Case-insensitive fallback if exact match not found
+    let user = users.find(
+      (u) =>
+        u.username.toLowerCase() === username.toLowerCase() ||
+        (u.email && u.email.toLowerCase() === username.toLowerCase()) ||
+        u.id === username,
+    );
+
+    if (!user) {
+      const allUsers = await this.prisma.user.findMany({
+        where: {
+          role: { in: ['ADMIN', 'SUPER_ADMIN', 'TEACHER'] },
+        },
+      });
+      user = allUsers.find(
+        (u) =>
+          u.username.toLowerCase() === username.toLowerCase() ||
+          (u.email && u.email.toLowerCase() === username.toLowerCase()) ||
+          u.id === username,
+      );
+    }
+
     const passwordHash = user?.passwordHash ?? '$2b$10$invalidsaltinvalidsaltinvalidsa';
     const passwordOk = await bcrypt.compare(dto.password, passwordHash);
 
-    const isAuthority = user && (user.role === 'ADMIN' || user.role === 'TEACHER') && user.isActive;
+    const isAuthority =
+      user &&
+      (user.role === 'ADMIN' || (user as any).role === 'SUPER_ADMIN' || user.role === 'TEACHER');
 
-    if (!user || !passwordOk || !isAuthority) {
+    if (!user || !passwordOk) {
       const attemptResult = this.rateLimiter.recordAttempt(rateLimitKey);
 
       // Log Security Violation
@@ -173,7 +198,15 @@ export class CbtService {
         );
       }
 
-      throw new UnauthorizedException('Invalid administrative credentials or insufficient privileges.');
+      throw new UnauthorizedException('Invalid administrative username or password.');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('This administrative account is deactivated. Contact system administrator.');
+    }
+
+    if (!isAuthority) {
+      throw new UnauthorizedException('Insufficient permissions. Administrator or Teacher credentials required.');
     }
 
     // Reset rate limiter on success
