@@ -24,6 +24,9 @@ const realtime_module_1 = require("./realtime/realtime.module");
 const cbt_module_1 = require("./cbt/cbt.module");
 const agent_theme_module_1 = require("./agent-theme/agent-theme.module");
 const common_module_1 = require("./common/common.module");
+const licensing_module_1 = require("./licensing/licensing.module");
+const institutions_module_1 = require("./institutions/institutions.module");
+const departments_module_1 = require("./departments/departments.module");
 const app_controller_1 = require("./app.controller");
 let AppModule = class AppModule {
 };
@@ -53,6 +56,9 @@ exports.AppModule = AppModule = __decorate([
             notification_module_1.NotificationsModule,
             cbt_module_1.CbtModule,
             agent_theme_module_1.AgentThemeModule,
+            licensing_module_1.LicensingModule,
+            institutions_module_1.InstitutionsModule,
+            departments_module_1.DepartmentsModule,
             realtime_module_1.RealtimeModule,
         ],
         providers: [

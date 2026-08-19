@@ -14,21 +14,21 @@ export declare class AdminAttendanceService {
         session: {
             id: string;
             createdAt: Date;
+            status: string;
             sessionCode: string;
             classTitle: string;
             teacherId: string;
-            status: string;
             endsAt: Date;
         };
         student: {
             id: string;
+            name: string | null;
+            isActive: boolean;
             username: string;
             regNumber: string | null;
             email: string | null;
-            name: string | null;
             mobile: string | null;
             classId: string | null;
-            isActive: boolean;
         };
     } & {
         id: string;
@@ -61,14 +61,14 @@ export declare class AdminAttendanceService {
     byStudent(studentId: string): Promise<{
         student: {
             id: string;
+            name: string | null;
+            isActive: boolean;
             username: string;
             regNumber: string | null;
             email: string | null;
             role: string;
-            name: string | null;
             mobile: string | null;
             classId: string | null;
-            isActive: boolean;
         };
         summary: {
             present: number;
@@ -82,9 +82,9 @@ export declare class AdminAttendanceService {
             session: {
                 id: string;
                 createdAt: Date;
+                status: string;
                 sessionCode: string;
                 classTitle: string;
-                status: string;
                 endsAt: Date;
             };
         } & {

@@ -3,43 +3,52 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-
-import { Roles, RolesGuard } from '../auth/roles.guard';
 import { AgentThemeService } from './agent-theme.service';
+import { JwtAuthGuard } from '../auth/jwt.strategy';
 
 @Controller('agent-theme')
 export class AgentThemeController {
   constructor(private readonly agentThemeService: AgentThemeService) {}
 
-  /*
-   * ==========================================
-   * GET ACTIVE THEME
-   * ==========================================
-   * GET /agent-theme/active
-   * * Accessible by: ALL (Public, ADMIN, TEACHER, STUDENT)
-   * Used by the Windows Agent and Admin Settings
-   * to load the organization's custom UI.
+  /**
+   * Public: Get active theme for interface (ADMIN, TEACHER, AGENT, ANDROID, GLOBAL)
    */
   @Get('active')
-  getActiveTheme() {
-    return this.agentThemeService.getActiveTheme();
+  getActiveTheme(
+    @Query('targetInterface') targetInterface?: string,
+    @Query('institutionId') institutionId?: string,
+  ) {
+    return this.agentThemeService.getActiveTheme(targetInterface || 'GLOBAL', institutionId);
   }
 
-  /*
-   * ==========================================
-   * UPDATE ACTIVE THEME
-   * ==========================================
-   * PATCH /agent-theme/active
-   * * Accessible by: ADMIN
-   * Used by the Admin Dashboard to save custom
-   * colors, labels, and branding.
+  /**
+   * Protected (Staff): List all configured interface themes
    */
+  @UseGuards(JwtAuthGuard)
+  @Get('all')
+  listAll() {
+    return this.agentThemeService.listAll();
+  }
+
+  /**
+   * Protected (Admin/Staff): Update active theme for interface
+   */
+  @UseGuards(JwtAuthGuard)
   @Patch('active')
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN')
   updateActiveTheme(@Body() updateData: any) {
     return this.agentThemeService.updateActiveTheme(updateData);
+  }
+
+  /**
+   * Protected (Admin/Staff): Restore default theme
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('reset')
+  restoreDefault(@Body() body: { targetInterface?: string }) {
+    return this.agentThemeService.restoreDefault(body?.targetInterface || 'GLOBAL');
   }
 }

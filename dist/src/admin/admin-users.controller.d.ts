@@ -10,29 +10,61 @@ export declare class AdminUsersController {
     constructor(usersService: AdminUsersService);
     createStudent(req: AuthenticatedRequest, dto: CreateStudentDto): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }>;
     createTeacher(req: AuthenticatedRequest, dto: CreateTeacherDto): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }>;
     createAdmin(req: AuthenticatedRequest, dto: {
         name?: string;
@@ -42,55 +74,139 @@ export declare class AdminUsersController {
         email?: string;
     }): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }>;
-    list(role?: 'STUDENT' | 'TEACHER' | 'ADMIN', classId?: string): Promise<{
+    list(req: AuthenticatedRequest, role?: 'STUDENT' | 'TEACHER' | 'ADMIN', classId?: string, institutionId?: string, departmentId?: string): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }[]>;
-    update(id: string, dto: UpdateUserDto): Promise<{
+    update(req: AuthenticatedRequest, id: string, dto: UpdateUserDto): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }>;
-    remove(id: string, hard?: string): Promise<{
+    remove(req: AuthenticatedRequest, id: string, hard?: string): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institutionId: string | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
+        passwordHash: string;
+        rollNumber: string | null;
         mobile: string | null;
         classId: string | null;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
+        lastActiveAt: Date | null;
+        createdById: string | null;
+    } | {
+        id: string;
+        name: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
+        username: string;
+        regNumber: string | null;
+        email: string | null;
+        role: string;
+        isSuperAdmin: boolean;
+        mobile: string | null;
+        classId: string | null;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }>;
 }
 export declare class TeacherStudentsController {
@@ -98,16 +214,32 @@ export declare class TeacherStudentsController {
     constructor(usersService: AdminUsersService);
     listStudents(classId?: string): Promise<{
         id: string;
+        name: string | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        institution: {
+            id: string;
+            code: string;
+            name: string;
+            board: string | null;
+            location: string | null;
+        } | null;
+        institutionId: string | null;
+        department: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
+        isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
-        isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
+        departmentId: string | null;
+        lastLoginAt: Date | null;
     }[]>;
 }
 export {};

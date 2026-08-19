@@ -15,16 +15,16 @@ export declare class NotificationsService {
     createMessage(currentUser: AuthUser, dto: CreateMessageDto): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         attachments: {
@@ -39,8 +39,8 @@ export declare class NotificationsService {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -55,24 +55,24 @@ export declare class NotificationsService {
     getInbox(currentUser: AuthUser, filter?: MessageFilterDto): Promise<({
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
             attachments: {
                 id: string;
@@ -86,8 +86,8 @@ export declare class NotificationsService {
             }[];
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -111,8 +111,8 @@ export declare class NotificationsService {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -127,23 +127,23 @@ export declare class NotificationsService {
     getSent(currentUser: AuthUser): Promise<({
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -167,8 +167,8 @@ export declare class NotificationsService {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -183,24 +183,24 @@ export declare class NotificationsService {
     getMessage(currentUser: AuthUser, messageId: string): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
             attachments: {
                 id: string;
@@ -214,8 +214,8 @@ export declare class NotificationsService {
             }[];
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -239,8 +239,8 @@ export declare class NotificationsService {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -273,20 +273,20 @@ export declare class NotificationsService {
     reply(currentUser: AuthUser, messageId: string, dto: ReplyMessageDto): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         } | null;
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -300,11 +300,11 @@ export declare class NotificationsService {
     }>;
     getRecipients(currentUser: AuthUser): Promise<{
         id: string;
+        name: string | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
         rollNumber: string | null;
         classId: string | null;
     }[]>;

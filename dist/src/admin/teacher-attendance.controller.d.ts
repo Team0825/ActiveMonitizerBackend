@@ -22,21 +22,21 @@ export declare class TeacherAttendanceController {
         session: {
             id: string;
             createdAt: Date;
+            status: string;
             sessionCode: string;
             classTitle: string;
             teacherId: string;
-            status: string;
             endsAt: Date;
         };
         student: {
             id: string;
+            name: string | null;
+            isActive: boolean;
             username: string;
             regNumber: string | null;
             email: string | null;
-            name: string | null;
             mobile: string | null;
             classId: string | null;
-            isActive: boolean;
         };
     } & {
         id: string;
@@ -69,14 +69,14 @@ export declare class TeacherAttendanceController {
     byStudent(studentId: string): Promise<{
         student: {
             id: string;
+            name: string | null;
+            isActive: boolean;
             username: string;
             regNumber: string | null;
             email: string | null;
             role: string;
-            name: string | null;
             mobile: string | null;
             classId: string | null;
-            isActive: boolean;
         };
         summary: {
             present: number;
@@ -90,9 +90,9 @@ export declare class TeacherAttendanceController {
             session: {
                 id: string;
                 createdAt: Date;
+                status: string;
                 sessionCode: string;
                 classTitle: string;
-                status: string;
                 endsAt: Date;
             };
         } & {

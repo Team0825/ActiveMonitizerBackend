@@ -57,6 +57,9 @@ import {
 
 import { AgentThemeModule } from './agent-theme/agent-theme.module';
 import { CommonModule } from './common/common.module';
+import { LicensingModule } from './licensing/licensing.module';
+import { InstitutionsModule } from './institutions/institutions.module';
+import { DepartmentsModule } from './departments/departments.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -104,6 +107,9 @@ import { AppController } from './app.controller';
     NotificationsModule,
     CbtModule,
     AgentThemeModule,
+    LicensingModule,
+    InstitutionsModule,
+    DepartmentsModule,
 
     /*
      * ==========================================

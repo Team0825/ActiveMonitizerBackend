@@ -7,6 +7,7 @@ export declare class PcsService {
     markOnline(hostname: string, labName?: string, sessionId?: string, studentId?: string): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;
@@ -41,6 +42,7 @@ export declare class PcsService {
     markOffline(hostname: string): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;
@@ -76,6 +78,7 @@ export declare class PcsService {
     touchHeartbeat(hostname: string): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;
@@ -110,6 +113,7 @@ export declare class PcsService {
     setStatus(hostname: string, status: 'ONLINE' | 'OFFLINE' | 'LOCKED' | 'FROZEN'): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;
@@ -144,6 +148,7 @@ export declare class PcsService {
     listPcsForSession(sessionId: string): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;
@@ -202,6 +207,7 @@ export declare class PcsService {
     updateSystemInfo(hostname: string, info: PcSystemInfoPayload): Promise<{
         id: string;
         updatedAt: Date;
+        institutionId: string | null;
         status: string;
         hostname: string;
         displayName: string | null;

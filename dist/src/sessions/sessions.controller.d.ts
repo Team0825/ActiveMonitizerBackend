@@ -227,6 +227,8 @@ export declare class SessionsController {
         }[] | undefined;
         id?: string | undefined;
         createdAt?: Date | undefined;
+        institutionId?: string | null | undefined;
+        status?: string | undefined;
         allowInternet?: boolean | undefined;
         allowClipboard?: boolean | undefined;
         allowUsb?: boolean | undefined;
@@ -246,7 +248,6 @@ export declare class SessionsController {
         teacherId?: string | undefined;
         durationMinutes?: number | undefined;
         joinWindowMinutes?: number | undefined;
-        status?: string | undefined;
         sessionMode?: string | undefined;
         allowOffline?: boolean | undefined;
         connectivityMode?: string | undefined;
@@ -306,8 +307,8 @@ export declare class SessionsController {
     }>;
     requestAccess(req: AuthenticatedRequest, dto: RequestSpecialAccessDto): Promise<{
         id: string;
-        sessionId: string;
         status: string;
+        sessionId: string;
         studentId: string;
         requestedAt: Date;
         handledById: string | null;
@@ -317,6 +318,8 @@ export declare class SessionsController {
         session: {
             id: string;
             createdAt: Date;
+            institutionId: string | null;
+            status: string;
             allowInternet: boolean;
             allowClipboard: boolean;
             allowUsb: boolean;
@@ -336,7 +339,6 @@ export declare class SessionsController {
             teacherId: string;
             durationMinutes: number;
             joinWindowMinutes: number;
-            status: string;
             sessionMode: string;
             allowOffline: boolean;
             connectivityMode: string;
@@ -353,14 +355,14 @@ export declare class SessionsController {
         };
         student: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
-            name: string | null;
         };
     } & {
         id: string;
-        sessionId: string;
         status: string;
+        sessionId: string;
         studentId: string;
         requestedAt: Date;
         handledById: string | null;
@@ -377,14 +379,14 @@ export declare class SessionsController {
         };
         student: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
-            name: string | null;
         };
     } & {
         id: string;
-        sessionId: string;
         status: string;
+        sessionId: string;
         studentId: string;
         requestedAt: Date;
         handledById: string | null;

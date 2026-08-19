@@ -10,11 +10,11 @@ export declare class NotificationsController {
     constructor(notificationsService: NotificationsService);
     getRecipients(req: AuthenticatedRequest): Promise<{
         id: string;
+        name: string | null;
         username: string;
         regNumber: string | null;
         email: string | null;
         role: string;
-        name: string | null;
         rollNumber: string | null;
         classId: string | null;
     }[]>;
@@ -22,24 +22,24 @@ export declare class NotificationsController {
     getInbox(req: AuthenticatedRequest, filter: MessageFilterDto): Promise<({
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
             attachments: {
                 id: string;
@@ -53,8 +53,8 @@ export declare class NotificationsController {
             }[];
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -78,8 +78,8 @@ export declare class NotificationsController {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -94,23 +94,23 @@ export declare class NotificationsController {
     getSent(req: AuthenticatedRequest): Promise<({
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -134,8 +134,8 @@ export declare class NotificationsController {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -150,16 +150,16 @@ export declare class NotificationsController {
     createMessage(req: AuthenticatedRequest, dto: CreateMessageDto): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         attachments: {
@@ -174,8 +174,8 @@ export declare class NotificationsController {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -190,20 +190,20 @@ export declare class NotificationsController {
     reply(req: AuthenticatedRequest, id: string, dto: ReplyMessageDto): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         } | null;
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;
@@ -236,24 +236,24 @@ export declare class NotificationsController {
     getMessage(req: AuthenticatedRequest, id: string): Promise<{
         sender: {
             id: string;
+            name: string | null;
             username: string;
             role: string;
-            name: string | null;
         };
         recipient: {
             id: string;
+            name: string | null;
             username: string;
             regNumber: string | null;
             role: string;
-            name: string | null;
             classId: string | null;
         } | null;
         replies: ({
             sender: {
                 id: string;
+                name: string | null;
                 username: string;
                 role: string;
-                name: string | null;
             };
             attachments: {
                 id: string;
@@ -267,8 +267,8 @@ export declare class NotificationsController {
             }[];
         } & {
             id: string;
-            classId: string | null;
             updatedAt: Date;
+            classId: string | null;
             sessionId: string | null;
             recipientId: string | null;
             recipientType: string;
@@ -292,8 +292,8 @@ export declare class NotificationsController {
         }[];
     } & {
         id: string;
-        classId: string | null;
         updatedAt: Date;
+        classId: string | null;
         sessionId: string | null;
         recipientId: string | null;
         recipientType: string;

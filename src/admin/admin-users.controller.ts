@@ -175,6 +175,9 @@ export class AdminUsersController {
 
   @Get()
   list(
+    @Req()
+    req: AuthenticatedRequest,
+
     @Query('role')
     role?:
       | 'STUDENT'
@@ -183,10 +186,18 @@ export class AdminUsersController {
 
     @Query('classId')
     classId?: string,
+
+    @Query('institutionId')
+    institutionId?: string,
+
+    @Query('departmentId')
+    departmentId?: string,
   ) {
     return this.usersService.listUsers(
       role,
       classId,
+      institutionId,
+      departmentId,
     );
   }
 
@@ -202,6 +213,9 @@ export class AdminUsersController {
 
   @Patch(':id')
   update(
+    @Req()
+    req: AuthenticatedRequest,
+
     @Param('id')
     id: string,
 
@@ -211,6 +225,7 @@ export class AdminUsersController {
     return this.usersService.updateUser(
       id,
       dto,
+      req.user.sub,
     );
   }
 
@@ -233,6 +248,9 @@ export class AdminUsersController {
 
   @Delete(':id')
   remove(
+    @Req()
+    req: AuthenticatedRequest,
+
     @Param('id')
     id: string,
 
@@ -242,6 +260,7 @@ export class AdminUsersController {
     return this.usersService.deleteUser(
       id,
       hard === 'true',
+      req.user.sub,
     );
   }
 }

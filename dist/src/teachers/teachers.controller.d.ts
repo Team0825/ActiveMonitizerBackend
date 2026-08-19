@@ -10,25 +10,25 @@ export declare class TeachersController {
     constructor(teachersService: TeachersService);
     getMyProfile(req: AuthenticatedTeacherRequest): Promise<{
         id: string;
-        username: string;
-        email: string | null;
-        role: string;
         name: string | null;
-        mobile: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
+        username: string;
+        email: string | null;
+        role: string;
+        mobile: string | null;
     }>;
     updateMyProfile(req: AuthenticatedTeacherRequest, dto: UpdateTeacherProfileDto): Promise<{
         id: string;
-        username: string;
-        email: string | null;
-        role: string;
         name: string | null;
-        mobile: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
+        username: string;
+        email: string | null;
+        role: string;
+        mobile: string | null;
     }>;
 }
 export {};

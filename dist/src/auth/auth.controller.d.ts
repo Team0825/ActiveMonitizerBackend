@@ -22,10 +22,29 @@ export declare class AuthController {
         user: {
             id: string;
             role: "ADMIN" | "TEACHER" | "STUDENT";
+            isSuperAdmin: boolean;
             username: string;
             name: string | null;
+            email: string | null;
+            mobile: string | null;
             regNumber: string | null;
             classId: string | null;
+            institutionId: string | null;
+            institution: {
+                id: string;
+                name: string;
+                code: string;
+                board: string | null;
+                location: string | null;
+            } | null;
+            departmentId: string | null;
+            department: {
+                id: string;
+                name: string;
+                code: string;
+            } | null;
+            createdAt: string;
+            lastLoginAt: string;
         };
         duplicateDetected?: undefined;
         challengeId?: undefined;
@@ -63,6 +82,82 @@ export declare class AuthController {
     changePassword(req: AuthenticatedRequest, dto: ChangePasswordDto): Promise<{
         success: boolean;
         message: string;
+    }>;
+    getProfileGet(req: AuthenticatedRequest): Promise<{
+        id: string;
+        name: string;
+        username: string;
+        email: string;
+        mobile: string;
+        role: string;
+        isSuperAdmin: boolean;
+        institution: {
+            id: string;
+            name: string;
+            code: string;
+            board: string | null;
+            location: string | null;
+        } | {
+            name: string;
+            id?: undefined;
+            code?: undefined;
+            board?: undefined;
+            location?: undefined;
+        };
+        department: {
+            id: string;
+            name: string;
+            code: string;
+        } | null;
+        licenseNumber: string;
+        activationStatus: string;
+        createdAt: string;
+        lastLoginAt: string;
+    }>;
+    getProfilePost(req: AuthenticatedRequest): Promise<{
+        id: string;
+        name: string;
+        username: string;
+        email: string;
+        mobile: string;
+        role: string;
+        isSuperAdmin: boolean;
+        institution: {
+            id: string;
+            name: string;
+            code: string;
+            board: string | null;
+            location: string | null;
+        } | {
+            name: string;
+            id?: undefined;
+            code?: undefined;
+            board?: undefined;
+            location?: undefined;
+        };
+        department: {
+            id: string;
+            name: string;
+            code: string;
+        } | null;
+        licenseNumber: string;
+        activationStatus: string;
+        createdAt: string;
+        lastLoginAt: string;
+    }>;
+    updateProfile(req: AuthenticatedRequest, body: {
+        name?: string;
+        email?: string;
+        mobile?: string;
+    }): Promise<{
+        id: string;
+        name: string | null;
+        updatedAt: Date;
+        username: string;
+        email: string | null;
+        role: string;
+        isSuperAdmin: boolean;
+        mobile: string | null;
     }>;
 }
 export {};

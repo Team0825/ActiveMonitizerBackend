@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
@@ -47,6 +47,29 @@ export class AuthController {
       dto.newPassword,
       dto.confirmPassword,
     );
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me')
+  async getProfileGet(@Req() req: AuthenticatedRequest) {
+    return this.authService.getProfile(req.user.sub);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(200)
+  @Post('me')
+  async getProfilePost(@Req() req: AuthenticatedRequest) {
+    return this.authService.getProfile(req.user.sub);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('update-profile')
+  @HttpCode(200)
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { name?: string; email?: string; mobile?: string },
+  ) {
+    return this.authService.updateProfile(req.user.sub, body);
   }
 }
 

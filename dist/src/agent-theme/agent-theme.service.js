@@ -8,38 +8,188 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var AgentThemeService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AgentThemeService = void 0;
+exports.AgentThemeService = exports.DEFAULT_THEME_VALUES = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-let AgentThemeService = class AgentThemeService {
+exports.DEFAULT_THEME_VALUES = {
+    themeName: 'Activity Monetizer Default',
+    themeMode: 'AUTO',
+    palette: 'DEFAULT',
+    primaryColor: '#2563EB',
+    secondaryColor: '#0F172A',
+    accentColor: '#22C55E',
+    backgroundColor: '#0F172A',
+    cardBackground: '#1E293B',
+    textColor: '#FFFFFF',
+    mutedTextColor: '#94A3B8',
+    buttonColor: '#2563EB',
+    buttonTextColor: '#FFFFFF',
+    headerColor: '#0F172A',
+    sidebarColor: '#0F172A',
+    borderColor: '#334155',
+    statusSuccess: '#22C55E',
+    statusWarning: '#F59E0B',
+    statusDanger: '#EF4444',
+    statusInfo: '#3B82F6',
+    logoUrl: '',
+    institutionName: 'National Institute of Science & Technology',
+    institutionBoard: 'Central Board of Secondary & Higher Education',
+    institutionLocation: 'Main Campus, Academic Complex',
+};
+let AgentThemeService = AgentThemeService_1 = class AgentThemeService {
     constructor(prisma) {
         this.prisma = prisma;
+        this.logger = new common_1.Logger(AgentThemeService_1.name);
     }
-    async getActiveTheme() {
-        let theme = await this.prisma.agentTheme.findFirst({
+    async getActiveTheme(targetInterface = 'GLOBAL', institutionId) {
+        const cleanInterface = (targetInterface || 'GLOBAL').toUpperCase();
+        let theme = await this.prisma.appTheme.findFirst({
+            where: {
+                targetInterface: cleanInterface,
+                isActive: true,
+                ...(institutionId ? { institutionId } : {}),
+            },
+            orderBy: { updatedAt: 'desc' },
+        });
+        if (!theme && cleanInterface !== 'GLOBAL') {
+            theme = await this.prisma.appTheme.findFirst({
+                where: {
+                    targetInterface: 'GLOBAL',
+                    isActive: true,
+                },
+                orderBy: { updatedAt: 'desc' },
+            });
+        }
+        let legacyAgentTheme = await this.prisma.agentTheme.findFirst({
             where: { isActive: true },
         });
-        if (!theme) {
-            theme = await this.prisma.agentTheme.create({
+        if (!legacyAgentTheme) {
+            legacyAgentTheme = await this.prisma.agentTheme.create({
                 data: {
                     themeName: 'Default Theme',
                     isActive: true,
                 },
             });
         }
-        return theme;
+        const base = theme || {
+            targetInterface: cleanInterface,
+            ...exports.DEFAULT_THEME_VALUES,
+        };
+        return {
+            ...legacyAgentTheme,
+            ...base,
+            targetInterface: cleanInterface,
+            mainBubbleBgColor: theme?.cardBackground || legacyAgentTheme.mainBubbleBgColor || '#1E293B',
+            secondaryPanelColor: theme?.secondaryColor || legacyAgentTheme.secondaryPanelColor || '#0F172A',
+            borderColor: theme?.borderColor || legacyAgentTheme.borderColor || '#334155',
+            accentColor: theme?.accentColor || legacyAgentTheme.accentColor || '#22C55E',
+            textColor: theme?.textColor || legacyAgentTheme.textColor || '#FFFFFF',
+            mutedTextColor: theme?.mutedTextColor || legacyAgentTheme.mutedTextColor || '#94A3B8',
+            buttonColor: theme?.buttonColor || legacyAgentTheme.buttonColor || '#334155',
+            buttonTextColor: theme?.buttonTextColor || legacyAgentTheme.buttonTextColor || '#FFFFFF',
+            organizationLogoUrl: theme?.logoUrl || legacyAgentTheme.organizationLogoUrl || '',
+        };
     }
     async updateActiveTheme(data) {
-        const currentTheme = await this.getActiveTheme();
-        return this.prisma.agentTheme.update({
-            where: { id: currentTheme.id },
-            data,
+        const targetInterface = (data.targetInterface || 'GLOBAL').toUpperCase();
+        try {
+            const currentLegacy = await this.prisma.agentTheme.findFirst({
+                where: { isActive: true },
+            });
+            if (currentLegacy) {
+                await this.prisma.agentTheme.update({
+                    where: { id: currentLegacy.id },
+                    data: {
+                        themeName: data.themeName || currentLegacy.themeName,
+                        mainBubbleBgColor: data.cardBackground || data.mainBubbleBgColor || currentLegacy.mainBubbleBgColor,
+                        secondaryPanelColor: data.secondaryColor || data.secondaryPanelColor || currentLegacy.secondaryPanelColor,
+                        borderColor: data.borderColor || currentLegacy.borderColor,
+                        accentColor: data.accentColor || currentLegacy.accentColor,
+                        textColor: data.textColor || currentLegacy.textColor,
+                        mutedTextColor: data.mutedTextColor || currentLegacy.mutedTextColor,
+                        buttonColor: data.buttonColor || currentLegacy.buttonColor,
+                        buttonTextColor: data.buttonTextColor || currentLegacy.buttonTextColor,
+                        organizationLogoUrl: data.logoUrl || data.organizationLogoUrl || currentLegacy.organizationLogoUrl,
+                    },
+                });
+            }
+        }
+        catch (err) {
+            this.logger.error('Failed to sync legacy AgentTheme:', err);
+        }
+        let existingAppTheme = await this.prisma.appTheme.findFirst({
+            where: {
+                targetInterface,
+            },
+        });
+        const payload = {
+            targetInterface,
+            themeName: data.themeName || `${targetInterface} Custom Theme`,
+            themeMode: data.themeMode || 'AUTO',
+            palette: data.palette || 'DEFAULT',
+            primaryColor: data.primaryColor || '#2563EB',
+            secondaryColor: data.secondaryColor || '#0F172A',
+            accentColor: data.accentColor || '#22C55E',
+            backgroundColor: data.backgroundColor || '#0F172A',
+            cardBackground: data.cardBackground || '#1E293B',
+            textColor: data.textColor || '#FFFFFF',
+            mutedTextColor: data.mutedTextColor || '#94A3B8',
+            buttonColor: data.buttonColor || '#2563EB',
+            buttonTextColor: data.buttonTextColor || '#FFFFFF',
+            headerColor: data.headerColor || '#0F172A',
+            sidebarColor: data.sidebarColor || '#0F172A',
+            borderColor: data.borderColor || '#334155',
+            statusSuccess: data.statusSuccess || '#22C55E',
+            statusWarning: data.statusWarning || '#F59E0B',
+            statusDanger: data.statusDanger || '#EF4444',
+            statusInfo: data.statusInfo || '#3B82F6',
+            logoUrl: data.logoUrl !== undefined ? data.logoUrl : null,
+            institutionName: data.institutionName || 'National Institute of Science & Technology',
+            institutionBoard: data.institutionBoard || 'Central Board of Secondary & Higher Education',
+            institutionLocation: data.institutionLocation || 'Main Campus, Academic Complex',
+            isActive: true,
+        };
+        if (existingAppTheme) {
+            return this.prisma.appTheme.update({
+                where: { id: existingAppTheme.id },
+                data: payload,
+            });
+        }
+        return this.prisma.appTheme.create({
+            data: payload,
+        });
+    }
+    async restoreDefault(targetInterface = 'GLOBAL') {
+        const cleanInterface = (targetInterface || 'GLOBAL').toUpperCase();
+        const existing = await this.prisma.appTheme.findFirst({
+            where: { targetInterface: cleanInterface },
+        });
+        const defaultData = {
+            ...exports.DEFAULT_THEME_VALUES,
+            targetInterface: cleanInterface,
+            themeName: `${cleanInterface} Default Theme`,
+            isActive: true,
+        };
+        if (existing) {
+            return this.prisma.appTheme.update({
+                where: { id: existing.id },
+                data: defaultData,
+            });
+        }
+        return this.prisma.appTheme.create({
+            data: defaultData,
+        });
+    }
+    async listAll() {
+        return this.prisma.appTheme.findMany({
+            orderBy: { targetInterface: 'asc' },
         });
     }
 };
 exports.AgentThemeService = AgentThemeService;
-exports.AgentThemeService = AgentThemeService = __decorate([
+exports.AgentThemeService = AgentThemeService = AgentThemeService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], AgentThemeService);

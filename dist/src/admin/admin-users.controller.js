@@ -30,14 +30,14 @@ let AdminUsersController = class AdminUsersController {
     createAdmin(req, dto) {
         return this.usersService.createAdmin(req.user.sub, dto);
     }
-    list(role, classId) {
-        return this.usersService.listUsers(role, classId);
+    list(req, role, classId, institutionId, departmentId) {
+        return this.usersService.listUsers(role, classId, institutionId, departmentId);
     }
-    update(id, dto) {
-        return this.usersService.updateUser(id, dto);
+    update(req, id, dto) {
+        return this.usersService.updateUser(id, dto, req.user.sub);
     }
-    remove(id, hard) {
-        return this.usersService.deleteUser(id, hard === 'true');
+    remove(req, id, hard) {
+        return this.usersService.deleteUser(id, hard === 'true', req.user.sub);
     }
 };
 exports.AdminUsersController = AdminUsersController;
@@ -67,26 +67,31 @@ __decorate([
 ], AdminUsersController.prototype, "createAdmin", null);
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)('role')),
-    __param(1, (0, common_1.Query)('classId')),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)('role')),
+    __param(2, (0, common_1.Query)('classId')),
+    __param(3, (0, common_1.Query)('institutionId')),
+    __param(4, (0, common_1.Query)('departmentId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [Object, String, String, String, String]),
     __metadata("design:returntype", void 0)
 ], AdminUsersController.prototype, "list", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, users_dto_1.UpdateUserDto]),
+    __metadata("design:paramtypes", [Object, String, users_dto_1.UpdateUserDto]),
     __metadata("design:returntype", void 0)
 ], AdminUsersController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Query)('hard')),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Query)('hard')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", void 0)
 ], AdminUsersController.prototype, "remove", null);
 exports.AdminUsersController = AdminUsersController = __decorate([

@@ -1,14 +1,13 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-
 import * as bcrypt from 'bcrypt';
-
 import { PrismaService } from '../prisma/prisma.service';
-
 import {
+  CreateAdminDto,
   CreateStudentDto,
   CreateTeacherDto,
   UpdateUserDto,
@@ -16,75 +15,46 @@ import {
 
 @Injectable()
 export class AdminUsersService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async getDefaultInstitutionId(): Promise<string | undefined> {
+    const inst = await this.prisma.institution.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return inst?.id;
+  }
 
   /**
    * =========================================================
    * CREATE STUDENT
    * =========================================================
-   *
-   * Creates a new STUDENT account.
-   *
-   * Student fields:
-   * - username
-   * - password
-   * - name (optional)
-   * - regNumber
-   * - mobile
-   * - email
-   * - classId
    */
-  async createStudent(
-    adminId: string,
-    dto: CreateStudentDto,
-  ) {
-    await this.assertUnique(
-      dto.username,
-      dto.regNumber,
-      dto.email,
-    );
+  async createStudent(adminId: string, dto: CreateStudentDto) {
+    await this.assertUnique(dto.username, dto.regNumber, dto.email);
 
-    const passwordHash =
-      await bcrypt.hash(
-        dto.password,
-        10,
-      );
+    const admin = await this.prisma.user.findUnique({ where: { id: adminId } });
+    const institutionId =
+      dto.institutionId || admin?.institutionId || (await this.getDefaultInstitutionId());
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
     return this.prisma.user.create({
       data: {
         role: 'STUDENT',
-
-        username:
-          dto.username.trim(),
-
+        username: dto.username.trim(),
+        name: dto.name?.trim() || null,
         passwordHash,
-
-        regNumber:
-          dto.regNumber.trim(),
-
-        mobile:
-          dto.mobile?.trim() ||
-          null,
-
-        email:
-          dto.email?.trim() ||
-          null,
-
-        classId:
-          dto.classId?.trim() ||
-          null,
-
-        createdById:
-          adminId,
-
-        isActive:
-          true,
+        regNumber: dto.regNumber.trim(),
+        mobile: dto.mobile?.trim() || null,
+        email: dto.email?.trim() || null,
+        classId: dto.classId?.trim() || null,
+        departmentId: dto.departmentId || null,
+        institutionId: institutionId || null,
+        createdById: adminId,
+        isActive: true,
       },
-
-      select:
-        this.safeSelect(),
+      select: this.safeSelect(),
     });
   }
 
@@ -92,55 +62,30 @@ export class AdminUsersService {
    * =========================================================
    * CREATE TEACHER
    * =========================================================
-   *
-   * Creates a new TEACHER account.
    */
-  async createTeacher(
-    adminId: string,
-    dto: CreateTeacherDto,
-  ) {
-    await this.assertUnique(
-      dto.username,
-      undefined,
-      dto.email,
-    );
+  async createTeacher(adminId: string, dto: CreateTeacherDto) {
+    await this.assertUnique(dto.username, undefined, dto.email);
 
-    const passwordHash =
-      await bcrypt.hash(
-        dto.password,
-        10,
-      );
+    const admin = await this.prisma.user.findUnique({ where: { id: adminId } });
+    const institutionId =
+      dto.institutionId || admin?.institutionId || (await this.getDefaultInstitutionId());
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
     return this.prisma.user.create({
       data: {
         role: 'TEACHER',
-
-        name:
-          dto.name?.trim() ||
-          null,
-
-        username:
-          dto.username.trim(),
-
+        name: dto.name?.trim() || null,
+        username: dto.username.trim(),
         passwordHash,
-
-        mobile:
-          dto.mobile?.trim() ||
-          null,
-
-        email:
-          dto.email?.trim() ||
-          null,
-
-        createdById:
-          adminId,
-
-        isActive:
-          true,
+        mobile: dto.mobile?.trim() || null,
+        email: dto.email?.trim() || null,
+        departmentId: dto.departmentId || null,
+        institutionId: institutionId || null,
+        createdById: adminId,
+        isActive: true,
       },
-
-      select:
-        this.safeSelect(),
+      select: this.safeSelect(),
     });
   }
 
@@ -149,30 +94,29 @@ export class AdminUsersService {
    * CREATE ADMIN
    * =========================================================
    */
-  async createAdmin(
-    adminId: string,
-    dto: { name?: string; username: string; password: string; mobile?: string; email?: string },
-  ) {
-    await this.assertUnique(
-      dto.username,
-      undefined,
-      dto.email,
-    );
+  async createAdmin(adminId: string, dto: CreateAdminDto) {
+    const creator = await this.prisma.user.findUnique({ where: { id: adminId } });
+    if (!creator?.isSuperAdmin && creator?.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Only Super Admin can create Administrator accounts.');
+    }
 
-    const passwordHash =
-      await bcrypt.hash(
-        dto.password,
-        10,
-      );
+    await this.assertUnique(dto.username, undefined, dto.email);
+
+    const institutionId =
+      dto.institutionId || creator.institutionId || (await this.getDefaultInstitutionId());
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
     return this.prisma.user.create({
       data: {
         role: 'ADMIN',
+        isSuperAdmin: false,
         name: dto.name?.trim() || null,
         username: dto.username.trim(),
         passwordHash,
         mobile: dto.mobile?.trim() || null,
         email: dto.email?.trim() || null,
+        institutionId: institutionId || null,
         createdById: adminId,
         isActive: true,
       },
@@ -184,42 +128,22 @@ export class AdminUsersService {
    * =========================================================
    * LIST USERS
    * =========================================================
-   *
-   * Examples:
-   *
-   * GET /admin/users
-   *
-   * GET /admin/users?role=STUDENT
-   *
-   * GET /admin/users?role=TEACHER
-   *
-   * GET /admin/users?role=ADMIN
    */
   async listUsers(
-    role?:
-      | 'STUDENT'
-      | 'TEACHER'
-      | 'ADMIN',
+    role?: 'STUDENT' | 'TEACHER' | 'ADMIN',
     classId?: string,
+    institutionId?: string,
+    departmentId?: string,
   ) {
     return this.prisma.user.findMany({
       where: {
-        ...(role
-          ? { role }
-          : {}),
-
-        ...(classId
-          ? { classId }
-          : {}),
+        ...(role ? { role } : {}),
+        ...(classId ? { classId } : {}),
+        ...(institutionId ? { institutionId } : {}),
+        ...(departmentId ? { departmentId } : {}),
       },
-
-      select:
-        this.safeSelect(),
-
-      orderBy: {
-        createdAt:
-          'desc',
-      },
+      select: this.safeSelect(),
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -227,203 +151,72 @@ export class AdminUsersService {
    * =========================================================
    * UPDATE USER
    * =========================================================
-   *
-   * Used for both Student and Teacher accounts.
-   *
-   * Only supplied fields are updated.
    */
-  async updateUser(
-    userId: string,
-    dto: UpdateUserDto,
-  ) {
-    const existing =
-      await this.prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-      });
-
+  async updateUser(userId: string, dto: UpdateUserDto, callerId?: string) {
+    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!existing) {
-      throw new NotFoundException(
-        'User not found',
-      );
+      throw new NotFoundException('User not found');
     }
 
-    /**
-     * Check username uniqueness
-     * if username is being changed.
-     */
-    if (
-      dto.username &&
-      dto.username.trim() !==
-        existing.username
-    ) {
-      const usernameExists =
-        await this.prisma.user.findUnique({
-          where: {
-            username:
-              dto.username.trim(),
-          },
-        });
+    if (callerId) {
+      const caller = await this.prisma.user.findUnique({ where: { id: callerId } });
 
-      if (usernameExists) {
-        throw new ConflictException(
-          'Username already in use',
+      // Super Admin protection: Normal Admin cannot modify Super Admin
+      if (existing.isSuperAdmin && (!caller?.isSuperAdmin && caller?.role !== 'SUPER_ADMIN')) {
+        throw new ForbiddenException('Only Super Admin can modify the Super Admin account.');
+      }
+
+      // Normal Admin cannot edit another Admin's personal information or credentials
+      if (
+        existing.role === 'ADMIN' &&
+        existing.id !== callerId &&
+        (!caller?.isSuperAdmin && caller?.role !== 'SUPER_ADMIN')
+      ) {
+        throw new ForbiddenException(
+          'Administrators cannot modify another Administrator account. Contact Super Admin.',
         );
       }
     }
 
-    /**
-     * Check registration number uniqueness
-     * if registration number is being changed.
-     */
-    if (
-      dto.regNumber &&
-      dto.regNumber.trim() !==
-        existing.regNumber
-    ) {
-      const regNumberExists =
-        await this.prisma.user.findUnique({
-          where: {
-            regNumber:
-              dto.regNumber.trim(),
-          },
-        });
-
-      if (regNumberExists) {
-        throw new ConflictException(
-          'Registration number already in use',
-        );
-      }
+    if (dto.username && dto.username.trim() !== existing.username) {
+      const usernameExists = await this.prisma.user.findUnique({
+        where: { username: dto.username.trim() },
+      });
+      if (usernameExists) throw new ConflictException('Username already in use');
     }
 
-    /**
-     * Check email uniqueness
-     * if email is being changed.
-     */
-    if (
-      dto.email &&
-      dto.email.trim() !==
-        existing.email
-    ) {
-      const emailExists =
-        await this.prisma.user.findUnique({
-          where: {
-            email:
-              dto.email.trim(),
-          },
-        });
-
-      if (emailExists) {
-        throw new ConflictException(
-          'Email already in use',
-        );
-      }
+    if (dto.regNumber && dto.regNumber.trim() !== existing.regNumber) {
+      const regNumberExists = await this.prisma.user.findUnique({
+        where: { regNumber: dto.regNumber.trim() },
+      });
+      if (regNumberExists) throw new ConflictException('Registration number already in use');
     }
 
-    /**
-     * Build update object dynamically.
-     *
-     * This prevents undefined fields
-     * from accidentally changing data.
-     */
-    const data: {
-      name?: string | null;
-      username?: string;
-      regNumber?: string | null;
-      mobile?: string | null;
-      email?: string | null;
-      classId?: string | null;
-      isActive?: boolean;
-      passwordHash?: string;
-    } = {};
-
-    if (
-      dto.name !==
-      undefined
-    ) {
-      data.name =
-        dto.name.trim() ||
-        null;
+    if (dto.email && dto.email.trim() !== existing.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: dto.email.trim() },
+      });
+      if (emailExists) throw new ConflictException('Email already in use');
     }
 
-    if (
-      dto.username !==
-      undefined
-    ) {
-      data.username =
-        dto.username.trim();
-    }
-
-    if (
-      dto.regNumber !==
-      undefined
-    ) {
-      data.regNumber =
-        dto.regNumber.trim() ||
-        null;
-    }
-
-    if (
-      dto.mobile !==
-      undefined
-    ) {
-      data.mobile =
-        dto.mobile.trim() ||
-        null;
-    }
-
-    if (
-      dto.email !==
-      undefined
-    ) {
-      data.email =
-        dto.email.trim() ||
-        null;
-    }
-
-    if (
-      dto.classId !==
-      undefined
-    ) {
-      data.classId =
-        dto.classId.trim() ||
-        null;
-    }
-
-    if (
-      dto.isActive !==
-      undefined
-    ) {
-      data.isActive =
-        dto.isActive;
-    }
-
-    /**
-     * Only hash and update password
-     * when a new password is provided.
-     */
-    if (
-      dto.password &&
-      dto.password.trim()
-    ) {
-      data.passwordHash =
-        await bcrypt.hash(
-          dto.password,
-          10,
-        );
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name.trim() || null;
+    if (dto.username !== undefined) data.username = dto.username.trim();
+    if (dto.regNumber !== undefined) data.regNumber = dto.regNumber.trim() || null;
+    if (dto.mobile !== undefined) data.mobile = dto.mobile.trim() || null;
+    if (dto.email !== undefined) data.email = dto.email.trim() || null;
+    if (dto.classId !== undefined) data.classId = dto.classId.trim() || null;
+    if (dto.departmentId !== undefined) data.departmentId = dto.departmentId || null;
+    if (dto.institutionId !== undefined) data.institutionId = dto.institutionId || null;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.password && dto.password.trim()) {
+      data.passwordHash = await bcrypt.hash(dto.password, 10);
     }
 
     return this.prisma.user.update({
-      where: {
-        id:
-          userId,
-      },
-
+      where: { id: userId },
       data,
-
-      select:
-        this.safeSelect(),
+      select: this.safeSelect(),
     });
   }
 
@@ -431,66 +224,34 @@ export class AdminUsersService {
    * =========================================================
    * DELETE USER
    * =========================================================
-   *
-   * Default:
-   * Soft delete.
-   *
-   * The account becomes inactive but historical
-   * attendance/session records remain available.
-   *
-   * hard=true:
-   * Permanently deletes the database record.
    */
-  async deleteUser(
-    userId: string,
-    hard = false,
-  ) {
-    const existing =
-      await this.prisma.user.findUnique({
-        where: {
-          id:
-            userId,
-        },
-      });
+  async deleteUser(userId: string, hard = false, callerId?: string) {
+    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) throw new NotFoundException('User not found');
 
-    if (!existing) {
-      throw new NotFoundException(
-        'User not found',
-      );
+    if (existing.isSuperAdmin) {
+      throw new ForbiddenException('Super Admin account cannot be deleted or disabled.');
     }
 
-    /**
-     * Hard delete.
-     *
-     * Note:
-     * This can fail if the user has related
-     * session/attendance records.
-     */
+    if (callerId) {
+      const caller = await this.prisma.user.findUnique({ where: { id: callerId } });
+      if (
+        existing.role === 'ADMIN' &&
+        existing.id !== callerId &&
+        (!caller?.isSuperAdmin && caller?.role !== 'SUPER_ADMIN')
+      ) {
+        throw new ForbiddenException('Administrators cannot delete other Administrators.');
+      }
+    }
+
     if (hard) {
-      return this.prisma.user.delete({
-        where: {
-          id:
-            userId,
-        },
-      });
+      return this.prisma.user.delete({ where: { id: userId } });
     }
 
-    /**
-     * Soft delete.
-     */
     return this.prisma.user.update({
-      where: {
-        id:
-          userId,
-      },
-
-      data: {
-        isActive:
-          false,
-      },
-
-      select:
-        this.safeSelect(),
+      where: { id: userId },
+      data: { isActive: false },
+      select: this.safeSelect(),
     });
   }
 
@@ -499,83 +260,28 @@ export class AdminUsersService {
    * UNIQUE FIELD VALIDATION
    * =========================================================
    */
-  private async assertUnique(
-    username: string,
-    regNumber?: string,
-    email?: string,
-  ) {
-    const normalizedUsername =
-      username.trim();
+  private async assertUnique(username: string, regNumber?: string, email?: string) {
+    const normalizedUsername = username.trim();
+    const normalizedRegNumber = regNumber?.trim();
+    const normalizedEmail = email?.trim();
 
-    const normalizedRegNumber =
-      regNumber?.trim();
-
-    const normalizedEmail =
-      email?.trim();
-
-    const clashes =
-      await this.prisma.user.findFirst({
-        where: {
-          OR: [
-            {
-              username:
-                normalizedUsername,
-            },
-
-            ...(normalizedRegNumber
-              ? [
-                  {
-                    regNumber:
-                      normalizedRegNumber,
-                  },
-                ]
-              : []),
-
-            ...(normalizedEmail
-              ? [
-                  {
-                    email:
-                      normalizedEmail,
-                  },
-                ]
-              : []),
-          ],
-        },
-      });
+    const clashes = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: normalizedUsername },
+          ...(normalizedRegNumber ? [{ regNumber: normalizedRegNumber }] : []),
+          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+        ],
+      },
+    });
 
     if (clashes) {
-      if (
-        clashes.username ===
-        normalizedUsername
-      ) {
-        throw new ConflictException(
-          'Username already in use',
-        );
-      }
-
-      if (
-        normalizedRegNumber &&
-        clashes.regNumber ===
-          normalizedRegNumber
-      ) {
-        throw new ConflictException(
-          'Registration number already in use',
-        );
-      }
-
-      if (
-        normalizedEmail &&
-        clashes.email ===
-          normalizedEmail
-      ) {
-        throw new ConflictException(
-          'Email already in use',
-        );
-      }
-
-      throw new ConflictException(
-        'User information already in use',
-      );
+      if (clashes.username === normalizedUsername) throw new ConflictException('Username already in use');
+      if (normalizedRegNumber && clashes.regNumber === normalizedRegNumber)
+        throw new ConflictException('Registration number already in use');
+      if (normalizedEmail && clashes.email === normalizedEmail)
+        throw new ConflictException('Email already in use');
+      throw new ConflictException('User information already in use');
     }
   }
 
@@ -583,45 +289,40 @@ export class AdminUsersService {
    * =========================================================
    * SAFE USER RESPONSE
    * =========================================================
-   *
-   * IMPORTANT:
-   * passwordHash must NEVER be returned
-   * to the frontend.
    */
   private safeSelect() {
     return {
-      id:
-        true,
-
-      role:
-        true,
-
-      name:
-        true,
-
-      username:
-        true,
-
-      regNumber:
-        true,
-
-      mobile:
-        true,
-
-      email:
-        true,
-
-      classId:
-        true,
-
-      isActive:
-        true,
-
-      createdAt:
-        true,
-
-      updatedAt:
-        true,
+      id: true,
+      role: true,
+      isSuperAdmin: true,
+      name: true,
+      username: true,
+      regNumber: true,
+      mobile: true,
+      email: true,
+      classId: true,
+      departmentId: true,
+      department: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+      institutionId: true,
+      institution: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          board: true,
+          location: true,
+        },
+      },
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      lastLoginAt: true,
     } as const;
   }
 }

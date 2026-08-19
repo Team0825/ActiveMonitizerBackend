@@ -14,35 +14,57 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AgentThemeController = void 0;
 const common_1 = require("@nestjs/common");
-const roles_guard_1 = require("../auth/roles.guard");
 const agent_theme_service_1 = require("./agent-theme.service");
+const jwt_strategy_1 = require("../auth/jwt.strategy");
 let AgentThemeController = class AgentThemeController {
     constructor(agentThemeService) {
         this.agentThemeService = agentThemeService;
     }
-    getActiveTheme() {
-        return this.agentThemeService.getActiveTheme();
+    getActiveTheme(targetInterface, institutionId) {
+        return this.agentThemeService.getActiveTheme(targetInterface || 'GLOBAL', institutionId);
+    }
+    listAll() {
+        return this.agentThemeService.listAll();
     }
     updateActiveTheme(updateData) {
         return this.agentThemeService.updateActiveTheme(updateData);
+    }
+    restoreDefault(body) {
+        return this.agentThemeService.restoreDefault(body?.targetInterface || 'GLOBAL');
     }
 };
 exports.AgentThemeController = AgentThemeController;
 __decorate([
     (0, common_1.Get)('active'),
+    __param(0, (0, common_1.Query)('targetInterface')),
+    __param(1, (0, common_1.Query)('institutionId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], AgentThemeController.prototype, "getActiveTheme", null);
 __decorate([
+    (0, common_1.UseGuards)(jwt_strategy_1.JwtAuthGuard),
+    (0, common_1.Get)('all'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AgentThemeController.prototype, "listAll", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_strategy_1.JwtAuthGuard),
     (0, common_1.Patch)('active'),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
-    (0, roles_guard_1.Roles)('ADMIN'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AgentThemeController.prototype, "updateActiveTheme", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_strategy_1.JwtAuthGuard),
+    (0, common_1.Post)('reset'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AgentThemeController.prototype, "restoreDefault", null);
 exports.AgentThemeController = AgentThemeController = __decorate([
     (0, common_1.Controller)('agent-theme'),
     __metadata("design:paramtypes", [agent_theme_service_1.AgentThemeService])

@@ -16,10 +16,10 @@ export declare class TeacherDashboardController {
         recentSessions: {
             id: string;
             createdAt: Date;
+            status: string;
             sessionCode: string;
             classTitle: string;
             durationMinutes: number;
-            status: string;
             endsAt: Date;
             _count: {
                 participants: number;

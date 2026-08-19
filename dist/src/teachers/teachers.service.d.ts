@@ -5,24 +5,24 @@ export declare class TeachersService {
     constructor(prisma: PrismaService);
     getMyProfile(teacherId: string): Promise<{
         id: string;
-        username: string;
-        email: string | null;
-        role: string;
         name: string | null;
-        mobile: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
+        username: string;
+        email: string | null;
+        role: string;
+        mobile: string | null;
     }>;
     updateMyProfile(teacherId: string, dto: UpdateTeacherProfileDto): Promise<{
         id: string;
-        username: string;
-        email: string | null;
-        role: string;
         name: string | null;
-        mobile: string | null;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
+        username: string;
+        email: string | null;
+        role: string;
+        mobile: string | null;
     }>;
 }

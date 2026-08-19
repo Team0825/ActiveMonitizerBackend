@@ -10,6 +10,7 @@ generator client {
 model User {
   id           String  @id @default(uuid())
   role         String
+  isSuperAdmin Boolean @default(false)
   username     String  @unique
   name         String?
   passwordHash String
@@ -19,6 +20,15 @@ model User {
   mobile     String?
   email      String? @unique
   classId    String?
+
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+
+  departmentId  String?
+  department    Department?  @relation(fields: [departmentId], references: [id])
+
+  lastLoginAt   DateTime?
+  lastActiveAt  DateTime?
 
   isActive Boolean @default(true)
 
@@ -50,6 +60,8 @@ model User {
   @@index([role])
   @@index([classId])
   @@index([rollNumber])
+  @@index([institutionId])
+  @@index([departmentId])
 }
 
 model ClassSession {
@@ -112,6 +124,9 @@ model ClassSession {
   createdAt DateTime @default(now())
   endsAt    DateTime
 
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+
   participants      SessionParticipant[]
   attendanceRecords Attendance[]
   accessRequests    SpecialAccessRequest[]
@@ -123,6 +138,7 @@ model ClassSession {
   @@index([createdAt])
   @@index([teacherId])
   @@index([cbtCode])
+  @@index([institutionId])
 }
 
 model Pc {
@@ -131,6 +147,9 @@ model Pc {
 
   displayName String?
   labName     String?
+
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
 
   status         String @default("OFFLINE")
   healthStatus   String @default("UNKNOWN")
@@ -184,6 +203,7 @@ model Pc {
   @@index([currentSessionId])
   @@index([currentStudentId])
   @@index([lastSeen])
+  @@index([institutionId])
 }
 
 model PcHealthReport {
@@ -623,6 +643,9 @@ model Exam {
   startsAt            DateTime?
   endsAt              DateTime?
 
+  institutionId       String?
+  institution         Institution?   @relation(fields: [institutionId], references: [id])
+
   attempts            ExamAttempt[]
   results             ExamResult[]
   pcRegistrations     CbtPcRegistration[]
@@ -635,6 +658,7 @@ model Exam {
   @@index([createdById])
   @@index([status])
   @@index([cbtCode])
+  @@index([institutionId])
 }
 
 model ExamAttempt {
@@ -787,5 +811,110 @@ model CbtRegistrationCode {
   @@index([code])
   @@index([isUsed])
 }
+
+model Institution {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  board       String?
+  location    String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  departments Department[]
+  licenses    License[]
+  sessions    ClassSession[]
+  pcs         Pc[]
+  exams       Exam[]
+  themes      AppTheme[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model Department {
+  id            String      @id @default(uuid())
+  name          String
+  code          String
+  description   String?
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  students      User[]
+
+  @@unique([institutionId, name])
+  @@unique([institutionId, code])
+  @@index([institutionId])
+  @@index([isActive])
+}
+
+model License {
+  id                 String      @id @default(uuid())
+  licenseNumber      String      @unique
+  activationKey      String      @unique
+  institutionId      String
+  institution        Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  machineFingerprint String?
+  machineName        String?
+  licenseType        String      @default("PRO") // PRO, ENTERPRISE, STANDARD
+  status             String      @default("ACTIVE") // ACTIVE, EXPIRED, REVOKED, INACTIVE
+  isActivated        Boolean     @default(false)
+  maxPcs             Int         @default(100)
+  activatedAt        DateTime?
+  expiresAt          DateTime?
+  lastValidatedAt    DateTime?
+  serverSignature    String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([licenseNumber])
+  @@index([activationKey])
+  @@index([institutionId])
+  @@index([machineFingerprint])
+  @@index([status])
+}
+
+model AppTheme {
+  id                  String       @id @default(uuid())
+  targetInterface     String       @default("GLOBAL") // GLOBAL, ADMIN, TEACHER, AGENT, ANDROID
+  themeName           String
+  themeMode           String       @default("AUTO") // LIGHT, DARK, AUTO, CUSTOM
+  palette             String       @default("DEFAULT")
+  primaryColor        String       @default("#2563EB")
+  secondaryColor      String       @default("#0F172A")
+  accentColor         String       @default("#22C55E")
+  backgroundColor     String       @default("#0F172A")
+  cardBackground      String       @default("#1E293B")
+  textColor           String       @default("#FFFFFF")
+  mutedTextColor      String       @default("#94A3B8")
+  buttonColor         String       @default("#2563EB")
+  buttonTextColor     String       @default("#FFFFFF")
+  headerColor         String       @default("#0F172A")
+  sidebarColor        String       @default("#0F172A")
+  borderColor         String       @default("#334155")
+  statusSuccess       String       @default("#22C55E")
+  statusWarning       String       @default("#F59E0B")
+  statusDanger        String       @default("#EF4444")
+  statusInfo          String       @default("#3B82F6")
+  logoUrl             String?
+  institutionName     String?
+  institutionBoard    String?
+  institutionLocation String?
+  institutionId       String?
+  institution         Institution? @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  isActive            Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([targetInterface])
+  @@index([isActive])
+}
+
 
 

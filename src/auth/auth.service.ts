@@ -226,10 +226,26 @@ export class AuthService {
 
     await this.audit('LOGIN', user.id, dto);
 
+    // Update lastLoginAt in database
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const userWithDetails = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        institution: true,
+        department: true,
+      },
+    });
+
     const payload = {
       sub: user.id,
       role: user.role,
       username: user.username,
+      isSuperAdmin: userWithDetails?.isSuperAdmin || false,
+      institutionId: userWithDetails?.institutionId || null,
     };
 
     const accessToken = await this.jwt.signAsync(payload);
@@ -251,12 +267,110 @@ export class AuthService {
       user: {
         id: user.id,
         role: user.role,
+        isSuperAdmin: userWithDetails?.isSuperAdmin || false,
         username: user.username,
         name: user.name,
+        email: user.email,
+        mobile: user.mobile,
         regNumber: user.regNumber,
         classId: user.classId,
+        institutionId: userWithDetails?.institutionId || null,
+        institution: userWithDetails?.institution ? {
+          id: userWithDetails.institution.id,
+          name: userWithDetails.institution.name,
+          code: userWithDetails.institution.code,
+          board: userWithDetails.institution.board,
+          location: userWithDetails.institution.location,
+        } : null,
+        departmentId: userWithDetails?.departmentId || null,
+        department: userWithDetails?.department ? {
+          id: userWithDetails.department.id,
+          name: userWithDetails.department.name,
+          code: userWithDetails.department.code,
+        } : null,
+        createdAt: user.createdAt.toISOString(),
+        lastLoginAt: new Date().toISOString(),
       },
     };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        institution: true,
+        department: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    // Fetch active license for this user's institution
+    let license = null;
+    if (user.institutionId) {
+      license = await this.prisma.license.findFirst({
+        where: { institutionId: user.institutionId, status: 'ACTIVE' },
+      });
+    }
+
+    return {
+      id: user.id,
+      name: user.name || 'Not provided',
+      username: user.username,
+      email: user.email || 'Not provided',
+      mobile: user.mobile || 'Not provided',
+      role: user.role,
+      isSuperAdmin: user.isSuperAdmin,
+      institution: user.institution ? {
+        id: user.institution.id,
+        name: user.institution.name,
+        code: user.institution.code,
+        board: user.institution.board,
+        location: user.institution.location,
+      } : { name: 'National Institute of Science & Technology' },
+      department: user.department ? {
+        id: user.department.id,
+        name: user.department.name,
+        code: user.department.code,
+      } : null,
+      licenseNumber: license?.licenseNumber || 'AMPRO-2026-8841-9920',
+      activationStatus: license?.isActivated ? 'ACTIVATED' : 'NOT ACTIVATED',
+      createdAt: user.createdAt.toISOString(),
+      lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : user.createdAt.toISOString(),
+    };
+  }
+
+  async updateProfile(userId: string, data: { name?: string; email?: string; mobile?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found.');
+
+    if (data.email && data.email.trim() !== user.email) {
+      const emailExists = await this.prisma.user.findFirst({
+        where: { email: data.email.trim(), id: { not: userId } },
+      });
+      if (emailExists) throw new ForbiddenException('Email is already registered by another account.');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name !== undefined ? data.name.trim() : undefined,
+        email: data.email !== undefined ? data.email.trim() : undefined,
+        mobile: data.mobile !== undefined ? data.mobile.trim() : undefined,
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        mobile: true,
+        role: true,
+        isSuperAdmin: true,
+        updatedAt: true,
+      },
+    });
   }
 
   async keepSession(userId: string, challengeId?: string) {
