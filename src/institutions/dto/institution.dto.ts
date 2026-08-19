@@ -47,3 +47,33 @@ export class UpdateInstitutionDto {
   @IsBoolean()
   isActive?: boolean;
 }
+
+export class UpdateInstitutionBrandingDto {
+  @IsOptional()
+  @IsString()
+  institutionId?: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  board?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  showInstituteBranding?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showPdfHeader?: boolean;
+}

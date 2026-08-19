@@ -15,6 +15,7 @@ class AskChatbotDto {
 }
 exports.AskChatbotDto = AskChatbotDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(8000),
     __metadata("design:type", String)
@@ -24,17 +25,28 @@ __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(2000),
     __metadata("design:type", String)
+], AskChatbotDto.prototype, "message", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
 ], AskChatbotDto.prototype, "errorMessage", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(500),
+    (0, class_validator_1.MaxLength)(1000),
     __metadata("design:type", String)
 ], AskChatbotDto.prototype, "question", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(30),
+    (0, class_validator_1.MaxLength)(50),
     __metadata("design:type", String)
 ], AskChatbotDto.prototype, "language", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], AskChatbotDto.prototype, "sessionId", void 0);
 //# sourceMappingURL=ask-chatbot.dto.js.map

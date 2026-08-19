@@ -18,6 +18,18 @@ export class InstitutionsController {
   constructor(private readonly institutionsService: InstitutionsService) {}
 
   @UseGuards(JwtAuthGuard)
+  @Get('branding')
+  async getBranding(@Req() req: any) {
+    return this.institutionsService.getBranding(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('branding')
+  async updateBranding(@Body() dto: any, @Req() req: any) {
+    return this.institutionsService.updateBranding(dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get()
   async listAll(@Req() req: any) {
     return this.institutionsService.listAll(req.user);

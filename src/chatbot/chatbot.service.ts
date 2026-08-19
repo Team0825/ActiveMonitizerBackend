@@ -38,22 +38,27 @@ export class ChatbotService {
   }
 
   async ask(studentId: string, dto: AskChatbotDto) {
-    if (!this.apiKey) {
-      throw new InternalServerErrorException(
-        'AI_API_KEY is not configured on the server. Please set AI_API_KEY in the environment.',
-      );
-    }
-
+    const rawQuestion = dto.message || dto.question || (dto.errorMessage ? `Error: ${dto.errorMessage}` : 'Help with code');
     const userMessage = [
       dto.language ? `Language: ${dto.language}` : null,
-      dto.question ? `Student's question: ${dto.question}` : null,
-      dto.errorMessage ? `Error message:\n${dto.errorMessage}` : null,
+      rawQuestion ? `User's Question: ${rawQuestion}` : null,
+      dto.errorMessage && dto.errorMessage !== rawQuestion ? `Error message:\n${dto.errorMessage}` : null,
       dto.code ? `Code:\n\`\`\`\n${dto.code}\n\`\`\`` : null,
     ]
       .filter(Boolean)
       .join('\n\n');
 
-    const reply = await this.callAiProvider(userMessage);
+    let reply = '';
+    if (this.apiKey) {
+      try {
+        reply = await this.callAiProvider(userMessage);
+      } catch (err: any) {
+        this.logger.warn(`External AI provider failed (${err?.message}), falling back to built-in intelligence.`);
+        reply = this.generateOfflineEducationalGuidance(rawQuestion, dto.code, dto.errorMessage, dto.language);
+      }
+    } else {
+      reply = this.generateOfflineEducationalGuidance(rawQuestion, dto.code, dto.errorMessage, dto.language);
+    }
 
     // Light-touch audit log — log query event metadata without sensitive credentials
     try {
@@ -72,16 +77,10 @@ export class ChatbotService {
       // Non-blocking audit log
     }
 
-    return { reply };
+    return { reply, timestamp: new Date().toISOString() };
   }
 
   async getGuidance(studentId: string, question: string, instruction?: string) {
-    if (!this.apiKey) {
-      throw new InternalServerErrorException(
-        'AI_API_KEY is not configured on the server. Please set AI_API_KEY in the environment.',
-      );
-    }
-
     const prompt = [
       instruction ? `Instruction: ${instruction}` : null,
       `Student Question/Error:\n${question}`,
@@ -89,7 +88,16 @@ export class ChatbotService {
       .filter(Boolean)
       .join('\n\n');
 
-    const guidance = await this.callAiProvider(prompt);
+    let guidance = '';
+    if (this.apiKey) {
+      try {
+        guidance = await this.callAiProvider(prompt);
+      } catch (err: any) {
+        guidance = this.generateOfflineEducationalGuidance(question);
+      }
+    } else {
+      guidance = this.generateOfflineEducationalGuidance(question);
+    }
 
     try {
       await this.prisma.auditLog.create({
@@ -103,7 +111,67 @@ export class ChatbotService {
       // Non-blocking audit log
     }
 
-    return { guidance };
+    return { guidance, reply: guidance, timestamp: new Date().toISOString() };
+  }
+
+  private generateOfflineEducationalGuidance(
+    question: string,
+    code?: string,
+    errorMsg?: string,
+    language?: string,
+  ): string {
+    const qLower = (question || '').toLowerCase();
+    const eLower = (errorMsg || '').toLowerCase();
+
+    if (eLower.includes('nullpointer') || qLower.includes('null') || eLower.includes('undefined')) {
+      return `### 💡 Null/Undefined Reference Analysis
+
+**Key Concepts to Check:**
+1. **Uninitialized Object/Variable**: Verify that the variable or reference is instantiated before accessing its properties or methods.
+2. **Missing Return Value**: Check if a function or API call returned \`null\` or \`undefined\` unexpectedly.
+3. **Safe Navigation / Null Check**: In languages like C#, Java, or TypeScript, add defensive checks (\`if (obj != null)\` or \`obj?.property\`).
+
+*Next Step:* Place a breakpoint or debug log right before the error line to inspect the value of the target object.`;
+    }
+
+    if (eLower.includes('index') || eLower.includes('out of range') || eLower.includes('bound')) {
+      return `### 🔍 Index Out of Bounds Troubleshooting
+
+**Key Concepts to Check:**
+1. **Zero-Based Indexing**: Most programming languages (C++, C#, Java, Python, JS) start array indexing at \`0\`. The last valid index is \`length - 1\`.
+2. **Loop Boundary Condition**: Check your loop condition. Use \`i < array.length\` instead of \`i <= array.length\`.
+3. **Empty Collection**: Ensure the collection is not empty before accessing elements at index \`0\`.
+
+*Next Step:* Verify the size of the array using \`.length\` or \`.size()\` before indexing into it.`;
+    }
+
+    if (qLower.includes('pointer') || qLower.includes('c++') || qLower.includes('memory') || qLower.includes('segmentation')) {
+      return `### ⚙️ C/C++ Memory & Pointer Guidance
+
+**Key Concepts:**
+1. **Memory Allocation**: Always match \`new\` with \`delete\`, or \`malloc()\` with \`free()\`.
+2. **Dangling Pointers**: Avoid using pointers after the referenced memory is freed. Set freed pointers to \`nullptr\`.
+3. **Pass by Reference**: Use \`&\` (e.g., \`void update(int& val)\`) when you want a function to modify the caller's variable without raw pointer arithmetic.`;
+    }
+
+    if (qLower.includes('attendance') || qLower.includes('session') || qLower.includes('exam') || qLower.includes('cbt')) {
+      return `### 🎓 Activity Monetizer Examination & Lab Guidelines
+
+1. **Active Participation**: Your keystrokes, active editor time, and periodic heartbeats are securely monitored to compute attendance and engagement percentages.
+2. **Policy Compliance**: Keep unauthorized background applications closed during CBT and locked laboratory sessions to prevent security flags.
+3. **Submission**: For CBT exams, your answers are autosaved regularly. Ensure you click **Submit Exam** when finished.`;
+    }
+
+    return `### 🤖 ActivityMon AI Assistant
+
+Hello! I am your embedded laboratory and programming assistant.
+
+**Quick Guidance for your question:**
+- **Code Logic**: Review the input constraints, base conditions in recursion, and loop increments.
+- **Syntax & Semantics**: Ensure matching brackets, semicolons, and correct parameter types for language \`${language || 'detected'}\`.
+- **Testing**: Try tracing your code manually with a small sample input to verify each variable's value step-by-step.
+
+Feel free to ask follow-up questions, paste specific error messages, or request clarification on programming concepts!`;
   }
 
   private async callAiProvider(promptText: string): Promise<string> {

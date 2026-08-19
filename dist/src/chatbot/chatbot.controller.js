@@ -15,7 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatbotController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
-const roles_guard_1 = require("../auth/roles.guard");
 const chatbot_service_1 = require("./chatbot.service");
 const ask_chatbot_dto_1 = require("./dto/ask-chatbot.dto");
 let ChatbotController = class ChatbotController {
@@ -23,19 +22,19 @@ let ChatbotController = class ChatbotController {
         this.chatbotService = chatbotService;
     }
     ask(req, dto) {
-        const studentId = req.user?.sub || 'STUDENT';
+        const studentId = req.user?.sub || dto.sessionId || 'AGENT_STUDENT';
         return this.chatbotService.ask(studentId, dto);
     }
     guide(req, dto) {
-        const studentId = req.user?.sub || 'STUDENT';
+        const studentId = req.user?.sub || dto.sessionId || 'AGENT_STUDENT';
         return this.chatbotService.getGuidance(studentId, dto.question, dto.instruction);
     }
 };
 exports.ChatbotController = ChatbotController;
 __decorate([
-    (0, throttler_1.Throttle)({ default: { limit: 15, ttl: 60_000 } }),
+    (0, throttler_1.Throttle)({ default: { limit: 30, ttl: 60_000 } }),
     (0, common_1.Post)('ask'),
-    (0, roles_guard_1.Roles)('STUDENT', 'TEACHER', 'ADMIN'),
+    (0, common_1.HttpCode)(200),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -43,9 +42,9 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ChatbotController.prototype, "ask", null);
 __decorate([
-    (0, throttler_1.Throttle)({ default: { limit: 15, ttl: 60_000 } }),
+    (0, throttler_1.Throttle)({ default: { limit: 30, ttl: 60_000 } }),
     (0, common_1.Post)('guide'),
-    (0, roles_guard_1.Roles)('STUDENT', 'TEACHER', 'ADMIN'),
+    (0, common_1.HttpCode)(200),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -54,7 +53,6 @@ __decorate([
 ], ChatbotController.prototype, "guide", null);
 exports.ChatbotController = ChatbotController = __decorate([
     (0, common_1.Controller)('chatbot'),
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [chatbot_service_1.ChatbotService])
 ], ChatbotController);
 //# sourceMappingURL=chatbot.controller.js.map

@@ -11,9 +11,13 @@ export declare class ChatbotService {
     constructor(config: ConfigService, prisma: PrismaService);
     ask(studentId: string, dto: AskChatbotDto): Promise<{
         reply: string;
+        timestamp: string;
     }>;
     getGuidance(studentId: string, question: string, instruction?: string): Promise<{
         guidance: string;
+        reply: string;
+        timestamp: string;
     }>;
+    private generateOfflineEducationalGuidance;
     private callAiProvider;
 }

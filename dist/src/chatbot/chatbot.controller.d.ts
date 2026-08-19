@@ -10,12 +10,16 @@ export declare class ChatbotController {
     constructor(chatbotService: ChatbotService);
     ask(req: AuthenticatedRequest, dto: AskChatbotDto): Promise<{
         reply: string;
+        timestamp: string;
     }>;
     guide(req: AuthenticatedRequest, dto: {
         question: string;
         instruction?: string;
+        sessionId?: string;
     }): Promise<{
         guidance: string;
+        reply: string;
+        timestamp: string;
     }>;
 }
 export {};

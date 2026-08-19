@@ -16,6 +16,10 @@ export class CreateDepartmentDto {
   @IsOptional()
   @IsString()
   institutionId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class UpdateDepartmentDto {

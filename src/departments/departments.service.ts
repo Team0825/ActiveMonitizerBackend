@@ -69,7 +69,7 @@ export class DepartmentsService {
         code,
         description: dto.description?.trim() || null,
         institutionId,
-        isActive: true,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
     });
   }

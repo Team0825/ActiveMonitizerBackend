@@ -1,9 +1,15 @@
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class AskChatbotDto {
+  @IsOptional()
   @IsString()
   @MaxLength(8000)
-  code: string;
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  message?: string;
 
   @IsOptional()
   @IsString()
@@ -12,11 +18,15 @@ export class AskChatbotDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  question?: string; // free-text question if there's no hard error, e.g. "why is this slow?"
+  @MaxLength(1000)
+  question?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(30)
-  language?: string; // e.g. "python", "java" — helps the model, purely informational
+  @MaxLength(50)
+  language?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
 }
