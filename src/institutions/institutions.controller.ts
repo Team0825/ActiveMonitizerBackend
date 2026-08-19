@@ -17,7 +17,6 @@ import { JwtAuthGuard } from '../auth/jwt.strategy';
 export class InstitutionsController {
   constructor(private readonly institutionsService: InstitutionsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Get('branding')
   async getBranding(@Req() req: any) {
     return this.institutionsService.getBranding(req.user);
