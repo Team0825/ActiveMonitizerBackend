@@ -153,8 +153,9 @@ export class AuthService {
       }
     }
 
-    // Duplicate Admin/Teacher Login Protection (Item 14)
-    if ((user.role === 'ADMIN' || user.role === 'TEACHER') && !dto.forceLogin) {
+    // Duplicate Admin/Teacher Login Protection
+    // Only applies to browser management sessions when no workstation hostname is provided and forceLogin is false
+    if ((user.role === 'ADMIN' || user.role === 'TEACHER') && !dto.forceLogin && !dto.pcHostname) {
       const existingSession = this.activeStaffSessions.get(user.id);
       const isSessionActive =
         existingSession &&
@@ -203,7 +204,7 @@ export class AuthService {
           };
           this.pendingChallenges.set(challengeId, challenge);
 
-          // Create HIGH PRIORITY security violation
+          // Create HIGH PRIORITY security violation safely
           try {
             const violation = await this.pcsService.logViolation(
               dto.pcHostname || 'Remote Device',
@@ -252,11 +253,15 @@ export class AuthService {
 
     await this.audit('LOGIN', user.id, dto);
 
-    // Update lastLoginAt in database
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    // Update lastLoginAt in database safely
+    try {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to update lastLoginAt: ${err?.message}`);
+    }
 
     const userWithDetails = await this.prisma.user.findUnique({
       where: { id: user.id },
@@ -323,8 +328,8 @@ export class AuthService {
           name: userWithDetails.department.name,
           code: userWithDetails.department.code,
         } : null,
-        createdAt: user.createdAt.toISOString(),
-        lastLoginAt: new Date().toISOString(),
+        createdAt: user.createdAt ? user.createdAt.toISOString() : new Date().toISOString(),
+        lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : new Date().toISOString(),
       },
     };
   }
@@ -525,13 +530,17 @@ export class AuthService {
   }
 
   private async audit(action: string, actorId: string | null, dto: LoginDto) {
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorId ?? 'UNKNOWN',
-        action,
-        targetPc: dto.pcHostname ?? null,
-        metadata: JSON.stringify({ username: dto.username, expectedRole: dto.expectedRole }),
-      },
-    });
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: actorId ?? 'UNKNOWN',
+          action,
+          targetPc: dto.pcHostname ?? null,
+          metadata: JSON.stringify({ username: dto.username, expectedRole: dto.expectedRole }),
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to record audit log (${action}): ${err?.message}`);
+    }
   }
 }

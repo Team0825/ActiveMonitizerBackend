@@ -54,7 +54,7 @@ export class CbtController {
     return this.cbtService.authorityLogin(dto);
   }
 
-  @Post('validate-unique-code')
+  @Post(['validate-unique-code', 'validate-unique-code-and-register'])
   validateUniqueCode(@Body() dto: ValidateUniqueCodeDto) {
     return this.cbtService.validateUniqueCodeAndRegister(dto);
   }

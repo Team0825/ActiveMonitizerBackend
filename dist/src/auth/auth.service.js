@@ -97,7 +97,7 @@ let AuthService = AuthService_1 = class AuthService {
                 throw new common_1.ForbiddenException('Your account is authenticated but does not have administrator or teacher access.');
             }
         }
-        if ((user.role === 'ADMIN' || user.role === 'TEACHER') && !dto.forceLogin) {
+        if ((user.role === 'ADMIN' || user.role === 'TEACHER') && !dto.forceLogin && !dto.pcHostname) {
             const existingSession = this.activeStaffSessions.get(user.id);
             const isSessionActive = existingSession &&
                 Date.now() - existingSession.lastActive.getTime() < 4 * 60 * 60 * 1000;
@@ -170,10 +170,15 @@ let AuthService = AuthService_1 = class AuthService {
         this.logger.log(`LOGIN_USER_FOUND: Authenticated userId=${user.id}, role=${user.role}, isSuperAdmin=${user.isSuperAdmin}`);
         this.logger.log(`PASSWORD_VALIDATED: Validation successful for user ${user.username}`);
         await this.audit('LOGIN', user.id, dto);
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
-        });
+        try {
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { lastLoginAt: new Date() },
+            });
+        }
+        catch (err) {
+            this.logger.warn(`Failed to update lastLoginAt: ${err?.message}`);
+        }
         const userWithDetails = await this.prisma.user.findUnique({
             where: { id: user.id },
             include: {
@@ -233,8 +238,8 @@ let AuthService = AuthService_1 = class AuthService {
                     name: userWithDetails.department.name,
                     code: userWithDetails.department.code,
                 } : null,
-                createdAt: user.createdAt.toISOString(),
-                lastLoginAt: new Date().toISOString(),
+                createdAt: user.createdAt ? user.createdAt.toISOString() : new Date().toISOString(),
+                lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : new Date().toISOString(),
             },
         };
     }
@@ -409,14 +414,19 @@ let AuthService = AuthService_1 = class AuthService {
         return { success: true, message: 'Password updated successfully.' };
     }
     async audit(action, actorId, dto) {
-        await this.prisma.auditLog.create({
-            data: {
-                actorId: actorId ?? 'UNKNOWN',
-                action,
-                targetPc: dto.pcHostname ?? null,
-                metadata: JSON.stringify({ username: dto.username, expectedRole: dto.expectedRole }),
-            },
-        });
+        try {
+            await this.prisma.auditLog.create({
+                data: {
+                    actorId: actorId ?? 'UNKNOWN',
+                    action,
+                    targetPc: dto.pcHostname ?? null,
+                    metadata: JSON.stringify({ username: dto.username, expectedRole: dto.expectedRole }),
+                },
+            });
+        }
+        catch (err) {
+            this.logger.warn(`Failed to record audit log (${action}): ${err?.message}`);
+        }
     }
 };
 exports.AuthService = AuthService;
