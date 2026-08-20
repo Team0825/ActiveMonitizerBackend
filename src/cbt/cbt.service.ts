@@ -313,6 +313,8 @@ export class CbtService {
           status: 'ONLINE',
           healthStatus: 'HEALTHY',
           internetStatus: 'ONLINE',
+          cbtStatus: 'REGISTERED',
+          lastSeen: now,
           currentSessionId: session?.id || exam?.sessionId || null,
         },
       });
@@ -321,6 +323,10 @@ export class CbtService {
         where: { hostname: pcHostname },
         data: {
           status: 'ONLINE',
+          healthStatus: 'HEALTHY',
+          internetStatus: 'ONLINE',
+          cbtStatus: 'REGISTERED',
+          lastSeen: now,
           currentSessionId: session?.id || exam?.sessionId || existingPc.currentSessionId,
         },
       });
@@ -350,6 +356,8 @@ export class CbtService {
       },
     });
 
+    this.logger.log(`[CBT_REGISTER] PC=${pcHostname} REGISTRATION_ID=${registration.id} SESSION_CODE=${code} STATUS=${registration.status}`);
+
     // 5. Broadcast real-time Socket.IO event to Admin & Teacher dashboards
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
@@ -365,6 +373,7 @@ export class CbtService {
       socketServer.emit('cbt:pc-list-updated', {
         cbtCode: code,
         examId: exam?.id,
+        pcHostname,
       });
     }
 
@@ -512,12 +521,12 @@ export class CbtService {
   async registerPcForCbt(dto: RegisterPcDto) {
     const cbtCode = dto.cbtCode.trim().toUpperCase();
     const pcHostname = dto.pcHostname.trim().toUpperCase();
-    const now = Date.now();
+    const nowMs = Date.now();
 
     // Check rate-limit block for this PC
     const rateLimit = this.failedAuthorityAttempts.get(pcHostname);
-    if (rateLimit && rateLimit.blockedUntil > now) {
-      const waitSeconds = Math.ceil((rateLimit.blockedUntil - now) / 1000);
+    if (rateLimit && rateLimit.blockedUntil > nowMs) {
+      const waitSeconds = Math.ceil((rateLimit.blockedUntil - nowMs) / 1000);
       throw new ForbiddenException(
         `Too many failed authority password attempts. PC "${pcHostname}" is locked out. Try again in ${waitSeconds} seconds.`,
       );
@@ -528,11 +537,11 @@ export class CbtService {
     if (!auth.valid) {
       const currentAttempts = (rateLimit?.count || 0) + 1;
       const isLockout = currentAttempts >= 3;
-      const blockedUntil = isLockout ? now + 10 * 60 * 1000 : 0; // 10 min block
+      const blockedUntil = isLockout ? nowMs + 10 * 60 * 1000 : 0; // 10 min block
 
       this.failedAuthorityAttempts.set(pcHostname, {
         count: currentAttempts,
-        lastAttempt: now,
+        lastAttempt: nowMs,
         blockedUntil,
       });
 
@@ -606,6 +615,8 @@ export class CbtService {
       throw new NotFoundException(`Invalid or unknown CBT Code: ${cbtCode}`);
     }
 
+    const nowDate = new Date();
+
     // Ensure PC record exists in Pc table
     const existingPc = await this.prisma.pc.findUnique({
       where: { hostname: pcHostname },
@@ -619,6 +630,8 @@ export class CbtService {
           status: 'ONLINE',
           healthStatus: 'HEALTHY',
           internetStatus: 'ONLINE',
+          cbtStatus: 'REGISTERED',
+          lastSeen: nowDate,
           currentSessionId: session?.id || exam?.sessionId || null,
         },
       });
@@ -627,6 +640,10 @@ export class CbtService {
         where: { hostname: pcHostname },
         data: {
           status: 'ONLINE',
+          healthStatus: 'HEALTHY',
+          internetStatus: 'ONLINE',
+          cbtStatus: 'REGISTERED',
+          lastSeen: nowDate,
           currentSessionId: session?.id || exam?.sessionId || existingPc.currentSessionId,
         },
       });
@@ -652,9 +669,11 @@ export class CbtService {
         examId: exam?.id || null,
         sessionId: session?.id || null,
         status: 'REGISTERED',
-        updatedAt: new Date(),
+        updatedAt: nowDate,
       },
     });
+
+    this.logger.log(`[CBT_REGISTER] PC=${pcHostname} REGISTRATION_ID=${registration.id} SESSION_CODE=${cbtCode} STATUS=${registration.status}`);
 
     // Broadcast real-time Socket.IO event to Admin & Teacher dashboards
     const socketServer = this.realtimeService.getServer();
@@ -671,6 +690,7 @@ export class CbtService {
       socketServer.emit('cbt:pc-list-updated', {
         cbtCode,
         examId: exam?.id,
+        pcHostname,
       });
     }
 
@@ -700,8 +720,10 @@ export class CbtService {
   }
 
   async listRegisteredPcs(cbtCodeOrExamId?: string) {
+    const isAll = !cbtCodeOrExamId || cbtCodeOrExamId === 'ALL' || cbtCodeOrExamId === 'undefined' || cbtCodeOrExamId === 'null' || cbtCodeOrExamId.trim() === '';
+    
     let exam = null;
-    if (cbtCodeOrExamId) {
+    if (!isAll) {
       exam = await this.prisma.exam.findFirst({
         where: {
           OR: [{ id: cbtCodeOrExamId }, { cbtCode: cbtCodeOrExamId.toUpperCase() }],
@@ -709,14 +731,17 @@ export class CbtService {
       });
     }
 
-    const cbtCode = exam?.cbtCode || (cbtCodeOrExamId ? cbtCodeOrExamId.toUpperCase() : undefined);
+    const cbtCode = exam?.cbtCode || (!isAll ? cbtCodeOrExamId?.toUpperCase() : undefined);
 
-    const whereClause: any = {};
-    if (cbtCode || exam?.id) {
-      whereClause.OR = [
-        ...(cbtCode ? [{ cbtCode }] : []),
-        ...(exam?.id ? [{ examId: exam.id }] : []),
-      ];
+    let whereClause: any = {};
+    if (!isAll && (cbtCode || exam?.id)) {
+      whereClause = {
+        OR: [
+          ...(cbtCode ? [{ cbtCode }] : []),
+          ...(exam?.id ? [{ examId: exam.id }] : []),
+          { examId: null }, // Include unassigned registered lab PCs so admin can allocate them
+        ],
+      };
     }
 
     const registrations = await this.prisma.cbtPcRegistration.findMany({
@@ -724,7 +749,7 @@ export class CbtService {
       include: {
         exam: { select: { id: true, title: true, subject: true, durationMinutes: true } },
       },
-      orderBy: { registeredAt: 'asc' },
+      orderBy: { registeredAt: 'desc' },
     });
 
     // Join with live PC status from Pc model
@@ -774,9 +799,11 @@ export class CbtService {
 
     const result = registrations.map((reg, index) => {
       const pcInfo = pcMap.get(reg.pcHostname.toUpperCase());
-      const lastSeenMs = pcInfo?.lastSeen ? new Date(pcInfo.lastSeen).getTime() : 0;
-      // PC is considered LIVE CONNECTED if lastSeen is within 45 seconds AND status is ONLINE
-      const isLiveConnected = pcInfo?.status === 'ONLINE' && now - lastSeenMs < 45 * 1000;
+      const lastSeenMs = pcInfo?.lastSeen
+        ? new Date(pcInfo.lastSeen).getTime()
+        : (reg.registeredAt ? new Date(reg.registeredAt).getTime() : 0);
+      const isRecent = (now - lastSeenMs < 120 * 1000) || (now - new Date(reg.registeredAt).getTime() < 120 * 1000);
+      const isLiveConnected = (pcInfo?.status === 'ONLINE' || reg.status === 'REGISTERED' || reg.status === 'ALLOCATED' || reg.status === 'UNLOCKED') && (isRecent || pcInfo?.status === 'ONLINE');
       const student = reg.assignedStudentId ? studentMap.get(reg.assignedStudentId) : null;
 
       let cbtStatus = reg.status;
@@ -803,10 +830,21 @@ export class CbtService {
         isOnline: isLiveConnected,
         healthStatus: pcInfo?.healthStatus || (isLiveConnected ? 'HEALTHY' : 'OFFLINE'),
         internetStatus: pcInfo?.internetStatus || (isLiveConnected ? 'ONLINE' : 'OFFLINE'),
-        lastSeen: pcInfo?.lastSeen || null,
+        lastSeen: pcInfo?.lastSeen || reg.registeredAt || null,
         registeredAt: reg.registeredAt,
         cbtStatus,
         isDobVerified: reg.isDobVerified,
+        pc: {
+          id: pcInfo?.id || reg.id,
+          hostname: reg.pcHostname,
+          displayName: pcInfo?.displayName || reg.pcHostname,
+          labName: pcInfo?.labName || 'Main Lab',
+          isOnline: isLiveConnected,
+          status: isLiveConnected ? 'ONLINE' : 'OFFLINE',
+          healthStatus: pcInfo?.healthStatus || 'HEALTHY',
+          internetStatus: pcInfo?.internetStatus || 'ONLINE',
+          lastSeen: pcInfo?.lastSeen || reg.registeredAt,
+        },
         assignedStudent: student
           ? {
               id: student.id,
@@ -842,6 +880,8 @@ export class CbtService {
 
     const onlineCount = result.filter((p) => p.isOnline).length;
     const offlineCount = result.length - onlineCount;
+
+    this.logger.log(`[CBT_REGISTRY_FETCH] target=${cbtCodeOrExamId || 'ALL'} COUNT=${result.length} ONLINE=${onlineCount}`);
 
     return {
       cbtCode: cbtCode || '',
