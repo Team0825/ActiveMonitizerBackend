@@ -33,7 +33,7 @@ export declare class AuthService {
         expiresAt: string;
         user: {
             id: string;
-            role: "ADMIN" | "TEACHER" | "STUDENT";
+            role: string;
             isSuperAdmin: boolean;
             username: string;
             name: string | null;

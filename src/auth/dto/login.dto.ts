@@ -14,8 +14,9 @@ export class LoginDto {
   @IsNotEmpty()
   password: string;
 
+  @IsOptional()
   @IsIn(['STUDENT', 'TEACHER', 'ADMIN'])
-  expectedRole: 'STUDENT' | 'TEACHER' | 'ADMIN';
+  expectedRole?: 'STUDENT' | 'TEACHER' | 'ADMIN';
 
   // Session ID is NOT required during authentication.
   // Students enter the Session Code after successful login.

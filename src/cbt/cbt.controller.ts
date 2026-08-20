@@ -10,8 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
-import { JwtPayload } from '../auth/jwt.strategy';
+import { JwtAuthGuard, JwtPayload } from '../auth/jwt.strategy';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CbtService } from './cbt.service';
 import {
@@ -36,7 +35,6 @@ import {
 type AuthenticatedRequest = Request & { user: JwtPayload };
 
 @Controller('cbt')
-@UseGuards(RolesGuard)
 export class CbtController {
   constructor(private readonly cbtService: CbtService) {}
 
@@ -56,12 +54,14 @@ export class CbtController {
     return this.cbtService.validateUniqueCodeAndRegister(dto);
   }
 
+  @UseGuards(RolesGuard)
   @Get('authority-password/status')
   @Roles('ADMIN')
   getAuthorityPasswordStatus() {
     return this.cbtService.getAuthorityPasswordStatus();
   }
 
+  @UseGuards(RolesGuard)
   @Post('authority-password')
   @Roles('ADMIN')
   setAuthorityPassword(
@@ -81,6 +81,7 @@ export class CbtController {
     return this.cbtService.recordRecoveryAudit(dto);
   }
 
+  @UseGuards(RolesGuard)
   @Post('admin-reauth')
   @Roles('ADMIN', 'TEACHER')
   adminReauth(
@@ -90,6 +91,7 @@ export class CbtController {
     return this.cbtService.verifyAdminCredentials(req.user.sub, dto.password);
   }
 
+  @UseGuards(RolesGuard)
   @Post('code/generate-one-time')
   @Roles('ADMIN', 'TEACHER')
   generateOneTimeCode(@Req() req: AuthenticatedRequest) {
@@ -101,6 +103,7 @@ export class CbtController {
     return this.cbtService.checkCbtPcStatus(pcHostname || '');
   }
 
+  @UseGuards(RolesGuard)
   @Post('code/generate')
   @Roles('ADMIN', 'TEACHER')
   async generateCode() {
@@ -119,6 +122,7 @@ export class CbtController {
     return this.cbtService.deleteRegisteredPc(target, dto.pcHostname);
   }
 
+  @UseGuards(RolesGuard)
   @Get('pcs')
   @Roles('ADMIN', 'TEACHER')
   listRegisteredPcs(@Query('cbtCode') cbtCode?: string, @Query('examId') examId?: string) {
@@ -126,6 +130,7 @@ export class CbtController {
     return this.cbtService.listRegisteredPcs(target);
   }
 
+  @UseGuards(RolesGuard)
   @Delete('pcs/:pcHostname')
   @Roles('ADMIN', 'TEACHER')
   deleteRegisteredPc(
@@ -137,6 +142,7 @@ export class CbtController {
     return this.cbtService.deleteRegisteredPc(target, pcHostname);
   }
 
+  @UseGuards(RolesGuard)
   @Post('exams/:id/lock-pcs')
   @Roles('ADMIN', 'TEACHER')
   lockPcConfig(
@@ -152,6 +158,7 @@ export class CbtController {
    * ==========================================================
    */
 
+  @UseGuards(RolesGuard)
   @Post('question-papers')
   @Roles('ADMIN', 'TEACHER')
   createQuestionPaper(
@@ -161,18 +168,21 @@ export class CbtController {
     return this.cbtService.createQuestionPaper(req.user.sub, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Get('question-papers')
   @Roles('ADMIN', 'TEACHER')
   listQuestionPapers(@Query('subject') subject?: string) {
     return this.cbtService.listQuestionPapers(subject);
   }
 
+  @UseGuards(RolesGuard)
   @Get('question-papers/:id')
   @Roles('ADMIN', 'TEACHER')
   getQuestionPaper(@Param('id') id: string) {
     return this.cbtService.getQuestionPaper(id);
   }
 
+  @UseGuards(RolesGuard)
   @Patch('question-papers/:id')
   @Roles('ADMIN', 'TEACHER')
   updateQuestionPaper(
@@ -182,12 +192,14 @@ export class CbtController {
     return this.cbtService.updateQuestionPaper(id, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Delete('question-papers/:id')
   @Roles('ADMIN', 'TEACHER')
   deleteQuestionPaper(@Param('id') id: string) {
     return this.cbtService.deleteQuestionPaper(id);
   }
 
+  @UseGuards(RolesGuard)
   @Post('question-papers/:id/questions')
   @Roles('ADMIN', 'TEACHER')
   addQuestion(
@@ -197,6 +209,7 @@ export class CbtController {
     return this.cbtService.addQuestion(paperId, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Patch('question-papers/:paperId/questions/:questionId')
   @Roles('ADMIN', 'TEACHER')
   updateQuestion(
@@ -207,6 +220,7 @@ export class CbtController {
     return this.cbtService.updateQuestion(paperId, questionId, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Delete('question-papers/:paperId/questions/:questionId')
   @Roles('ADMIN', 'TEACHER')
   deleteQuestion(
@@ -222,6 +236,7 @@ export class CbtController {
    * ==========================================================
    */
 
+  @UseGuards(RolesGuard)
   @Post('exams')
   @Roles('ADMIN', 'TEACHER')
   createExam(
@@ -231,6 +246,7 @@ export class CbtController {
     return this.cbtService.createExam(req.user.sub, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Get('exams')
   @Roles('ADMIN', 'TEACHER')
   listExams(
@@ -240,12 +256,14 @@ export class CbtController {
     return this.cbtService.listExams(sessionId, status);
   }
 
+  @UseGuards(RolesGuard)
   @Get('exams/:id')
   @Roles('ADMIN', 'TEACHER')
   getExam(@Param('id') id: string) {
     return this.cbtService.getExam(id);
   }
 
+  @UseGuards(RolesGuard)
   @Patch('exams/:id')
   @Roles('ADMIN', 'TEACHER')
   updateExam(
@@ -255,12 +273,14 @@ export class CbtController {
     return this.cbtService.updateExam(id, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Delete('exams/:id')
   @Roles('ADMIN', 'TEACHER')
   deleteExam(@Param('id') id: string) {
     return this.cbtService.deleteExam(id);
   }
 
+  @UseGuards(RolesGuard)
   @Patch('exams/:id/publish-results')
   @Roles('ADMIN', 'TEACHER')
   publishResults(
@@ -270,12 +290,14 @@ export class CbtController {
     return this.cbtService.publishResults(id, publish);
   }
 
+  @UseGuards(RolesGuard)
   @Get('exams/:id/stats')
   @Roles('ADMIN', 'TEACHER')
   getExamStats(@Param('id') id: string) {
     return this.cbtService.getExamStats(id);
   }
 
+  @UseGuards(RolesGuard)
   @Get('exams/:id/corrections')
   @Roles('ADMIN', 'TEACHER')
   getCorrectionAudit(@Param('id') id: string) {
@@ -288,6 +310,7 @@ export class CbtController {
    * ==========================================================
    */
 
+  @UseGuards(JwtAuthGuard)
   @Get('student/active')
   getStudentActiveExam(
     @Req() req: AuthenticatedRequest,
@@ -297,6 +320,7 @@ export class CbtController {
     return this.cbtService.getStudentActiveExam(req.user.sub, sessionCodeOrId, pcHostname);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('student/start')
   startExam(
     @Req() req: AuthenticatedRequest,
@@ -305,6 +329,7 @@ export class CbtController {
     return this.cbtService.startExam(req.user.sub, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('student/answer')
   saveAnswer(
     @Req() req: AuthenticatedRequest,
@@ -313,6 +338,7 @@ export class CbtController {
     return this.cbtService.saveAnswer(req.user.sub, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('student/submit')
   submitExam(
     @Req() req: AuthenticatedRequest,
@@ -321,6 +347,7 @@ export class CbtController {
     return this.cbtService.submitExam(req.user.sub, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('student/result/:examId')
   getStudentResult(
     @Req() req: AuthenticatedRequest,
@@ -335,6 +362,7 @@ export class CbtController {
    * ==========================================================
    */
 
+  @UseGuards(RolesGuard)
   @Get('results')
   @Roles('ADMIN', 'TEACHER')
   getResults(
@@ -344,6 +372,7 @@ export class CbtController {
     return this.cbtService.getResults(examId, sessionId);
   }
 
+  @UseGuards(RolesGuard)
   @Post('results/:id/correct')
   @Roles('ADMIN')
   correctResult(
@@ -354,6 +383,7 @@ export class CbtController {
     return this.cbtService.correctResult(resultId, req.user.sub, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Post('exams/:id/generate-results')
   @Roles('ADMIN', 'TEACHER')
   generateResults(
@@ -363,6 +393,7 @@ export class CbtController {
     return this.cbtService.generateResults(examId, dto);
   }
 
+  @UseGuards(RolesGuard)
   @Post('offline-sync')
   @Roles('STUDENT', 'ADMIN', 'TEACHER')
   offlineSync(

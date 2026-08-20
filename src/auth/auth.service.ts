@@ -124,11 +124,25 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.role !== dto.expectedRole) {
-      await this.audit('LOGIN_FAILED_ROLE_MISMATCH', user.id, dto);
-      throw new ForbiddenException(
-        `This account is not a ${dto.expectedRole.toLowerCase()} account`,
-      );
+    if (dto.expectedRole) {
+      if (user.role !== dto.expectedRole) {
+        await this.audit('LOGIN_FAILED_ROLE_MISMATCH', user.id, dto);
+        throw new ForbiddenException(
+          `This account is not a ${dto.expectedRole.toLowerCase()} account`,
+        );
+      }
+    } else {
+      const isStaffOrAuthority =
+        user.role === 'ADMIN' ||
+        user.role === 'TEACHER' ||
+        (user as any).role === 'SUPER_ADMIN';
+
+      if (!isStaffOrAuthority) {
+        await this.audit('LOGIN_FAILED_ROLE_MISMATCH', user.id, dto);
+        throw new ForbiddenException(
+          'Your account is authenticated but does not have administrator or teacher access.',
+        );
+      }
     }
 
     // Duplicate Admin/Teacher Login Protection (Item 14)

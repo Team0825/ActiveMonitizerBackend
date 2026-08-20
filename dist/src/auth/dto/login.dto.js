@@ -25,6 +25,7 @@ __decorate([
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsIn)(['STUDENT', 'TEACHER', 'ADMIN']),
     __metadata("design:type", String)
 ], LoginDto.prototype, "expectedRole", void 0);

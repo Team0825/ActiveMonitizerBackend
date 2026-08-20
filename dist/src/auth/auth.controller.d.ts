@@ -28,7 +28,7 @@ export declare class AuthController {
         expiresAt: string;
         user: {
             id: string;
-            role: "ADMIN" | "TEACHER" | "STUDENT";
+            role: string;
             isSuperAdmin: boolean;
             username: string;
             name: string | null;
