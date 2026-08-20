@@ -18,6 +18,7 @@ import { PcsService } from '../pcs/pcs.service';
 import {
   AuthorityLoginDto,
   AllocateStudentDto,
+  AutoAllocateStudentDto,
   CorrectResultDto,
   CreateExamDto,
   CreateQuestionDto,
@@ -1050,6 +1051,66 @@ export class CbtService {
     };
   }
 
+  async autoAllocateStudent(adminId: string, dto: AutoAllocateStudentDto) {
+    const studentId = (dto.studentId || '').trim();
+    if (!studentId) {
+      throw new BadRequestException('studentId is required for automatic allocation.');
+    }
+
+    const student = await this.prisma.user.findFirst({
+      where: { id: studentId, role: 'STUDENT' },
+      include: { department: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException(`Student record not found for ID: ${studentId}`);
+    }
+
+    // Check if student already assigned to an active workstation
+    const existing = await this.prisma.cbtPcRegistration.findFirst({
+      where: {
+        assignedStudentId: student.id,
+        status: { in: ['ALLOCATED', 'EXAM_READY', 'EXAM_RUNNING', 'UNLOCKED'] },
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Candidate "${student.name || student.username}" (${student.regNumber || student.username}) is already assigned to workstation ${existing.pcHostname}.`,
+      );
+    }
+
+    // Find available registered workstations with no assigned student
+    const availablePcs = await this.prisma.cbtPcRegistration.findMany({
+      where: {
+        assignedStudentId: null,
+        ...(dto.cbtCode ? { cbtCode: dto.cbtCode.trim().toUpperCase() } : {}),
+        ...(dto.examId ? { OR: [{ examId: dto.examId }, { examId: null }] } : {}),
+      },
+      orderBy: { registeredAt: 'asc' },
+    });
+
+    if (!availablePcs || availablePcs.length === 0) {
+      throw new BadRequestException(
+        'No available physical workstations found waiting for candidate allocation. Please ensure physical PCs are registered with the examination server.',
+      );
+    }
+
+    // Pick the first available workstation or randomize
+    const targetPc = availablePcs[0];
+
+    return this.allocateStudent(adminId, {
+      pcHostname: targetPc.pcHostname,
+      pcRegistrationId: targetPc.id,
+      studentId: student.id,
+      examId: dto.examId || targetPc.examId || undefined,
+      sessionId: dto.sessionId || targetPc.sessionId || undefined,
+      cbtCode: targetPc.cbtCode,
+      invigilatorId: dto.invigilatorId,
+      invigilatorName: dto.invigilatorName,
+    });
+  }
+
   async deallocateStudent(adminId: string, dto: DeallocateStudentDto) {
     const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
 
@@ -1303,113 +1364,581 @@ export class CbtService {
    * ==========================================================
    */
 
-  async getPcAllocation(pcHostname: string) {
-    const upperHost = (pcHostname || '').trim().toUpperCase();
-    if (!upperHost) {
-      return { registered: false, cbtStatus: 'IDLE', pcHostname: '' };
-    }
-
-    const reg = await this.prisma.cbtPcRegistration.findFirst({
-      where: { pcHostname: upperHost },
-      include: {
-        exam: {
-          include: {
-            session: true,
-            questionPaper: {
-              select: {
-                id: true,
-                title: true,
-                subject: true,
-                totalMarks: true,
-                passingMarks: true,
-                _count: { select: { questions: true } },
-              },
-            },
-          },
-        },
-      },
+  async getPcAllocation(pcHostname?: string, cbtCode?: string) {
+    return this.getStudentCbtExamination({
+      pcHostname: pcHostname || '',
+      cbtCode: cbtCode || '',
     });
+  }
 
-    const pc = await this.prisma.pc.findUnique({
-      where: { hostname: upperHost },
-    });
+  /**
+   * ==========================================================
+   * GET /student/cbt & GET /cbt/pc-allocation
+   *
+   * Unified authoritative endpoint for physical CBT agent,
+   * student browser client, and admin polling.
+   *
+   * Returns:
+   *  - WAITING_FOR_ALLOCATION (200 OK) when PC registered but unallocated
+   *  - READY / EXAM_IN_PROGRESS with full examination payload when allocated
+   *  - PC_NOT_REGISTERED / INVALID_CBT_CODE when PC not found
+   *  - Server-authoritative countdown timer
+   * ==========================================================
+   */
+  async getStudentCbtExamination(params: { pcHostname?: string; cbtCode?: string }) {
+    const upperHost = (params.pcHostname || '').trim().toUpperCase();
+    const cleanCbtCode = (params.cbtCode || '').trim().toUpperCase();
+    const now = new Date();
 
+    // 1. Fetch institution branding
     const branding = await this.prisma.institution.findFirst({
       where: { isActive: true },
       orderBy: { createdAt: 'asc' },
     });
 
-    if (!reg && !pc) {
-      return {
-        registered: false,
-        cbtStatus: 'IDLE',
-        pcHostname: upperHost,
-        institution: branding ? { name: branding.name, board: branding.board, location: branding.location, logoUrl: branding.logoUrl } : null,
-      };
-    }
+    const institutionPayload = branding
+      ? {
+          name: branding.name,
+          code: branding.code,
+          board: branding.board || 'Central Board of Secondary & Higher Education',
+          location: branding.location || 'Main Examination Center',
+          logoUrl: branding.logoUrl || null,
+        }
+      : {
+          name: 'Central Examination Authority',
+          code: 'CEA',
+          board: 'Central Board of Secondary & Higher Education',
+          location: 'Main Examination Center',
+          logoUrl: null,
+        };
 
-    let student = null;
-    if (reg?.assignedStudentId || pc?.assignedStudentId) {
-      const studentId = reg?.assignedStudentId || pc?.assignedStudentId || '';
-      student = await this.prisma.user.findUnique({
-        where: { id: studentId },
-        include: { department: true },
+    // 2. Locate CBT PC Registration
+    let reg: any = null;
+    if (upperHost && cleanCbtCode) {
+      reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: {
+          pcHostname: upperHost,
+          cbtCode: cleanCbtCode,
+        },
+        include: {
+          exam: {
+            include: {
+              session: true,
+              questionPaper: {
+                include: {
+                  questions: {
+                    orderBy: { orderIndex: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
     }
 
-    const isAssigned = !!reg?.assignedStudentId;
-    const isVerified = reg?.isDobVerified || false;
-    let computedStatus = 'REGISTERED';
-    if (isVerified) {
-      computedStatus = 'EXAM_READY';
-    } else if (isAssigned) {
-      computedStatus = 'ALLOCATED';
-    } else if (reg || pc) {
-      computedStatus = 'WAITING_FOR_ALLOCATION';
+    if (!reg && upperHost) {
+      reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { pcHostname: upperHost },
+        orderBy: { registeredAt: 'desc' },
+        include: {
+          exam: {
+            include: {
+              session: true,
+              questionPaper: {
+                include: {
+                  questions: {
+                    orderBy: { orderIndex: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!reg && cleanCbtCode) {
+      reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { cbtCode: cleanCbtCode },
+        orderBy: { registeredAt: 'desc' },
+        include: {
+          exam: {
+            include: {
+              session: true,
+              questionPaper: {
+                include: {
+                  questions: {
+                    orderBy: { orderIndex: 'asc' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Lookup PC record from Pc table
+    const pc = upperHost
+      ? await this.prisma.pc.findUnique({
+          where: { hostname: upperHost },
+        })
+      : null;
+
+    // 3. If workstation is NOT registered in database
+    if (!reg && !pc) {
+      return {
+        status: 'PC_NOT_REGISTERED',
+        assignmentStatus: 'PC_NOT_REGISTERED',
+        registered: false,
+        cbtStatus: 'IDLE',
+        pcHostname: upperHost,
+        cbtCode: cleanCbtCode || null,
+        institution: institutionPayload,
+        message: 'Workstation is not registered for CBT. Please register via the Windows Agent or Admin Console.',
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+        remainingSeconds: 0,
+      };
+    }
+
+    // 4. If registered but NO student is currently allocated
+    const assignedStudentId = reg?.assignedStudentId || pc?.assignedStudentId;
+    if (!assignedStudentId) {
+      return {
+        status: 'WAITING_FOR_ALLOCATION',
+        assignmentStatus: 'WAITING_FOR_ALLOCATION',
+        registered: true,
+        cbtStatus: 'WAITING_FOR_ALLOCATION',
+        assigned: false,
+        isDobVerified: false,
+        candidateVerificationRequired: false,
+        pcHostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+        cbtCode: reg?.cbtCode || cleanCbtCode || 'CBT_SESSION',
+        pcRegistrationId: reg?.id || null,
+        pc: {
+          hostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+          labName: pc?.labName || 'Main Lab',
+          ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+          isOnline: pc?.status === 'ONLINE',
+          lastSeen: pc?.lastSeen || null,
+        },
+        institution: institutionPayload,
+        session: reg?.exam?.session
+          ? {
+              id: reg.exam.session.id,
+              sessionCode: reg.exam.session.sessionCode,
+              classTitle: reg.exam.session.classTitle,
+              durationMinutes: reg.exam.session.durationMinutes,
+            }
+          : null,
+        exam: reg?.exam
+          ? {
+              id: reg.exam.id,
+              title: reg.exam.title,
+              subject: reg.exam.subject,
+              durationMinutes: reg.exam.durationMinutes,
+              totalMarks: reg.exam.totalMarks,
+              passingMarks: reg.exam.passingMarks,
+              questionCount: reg.exam.questionPaper?.questions?.length || 0,
+            }
+          : null,
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+        remainingSeconds: 0,
+        message: 'Workstation registered. Waiting for candidate allocation by administrator.',
+      };
+    }
+
+    // 5. Lookup assigned student details
+    const student = await this.prisma.user.findUnique({
+      where: { id: assignedStudentId },
+      include: { department: true, institution: true },
+    });
+
+    if (!student) {
+      return {
+        status: 'WAITING_FOR_ALLOCATION',
+        assignmentStatus: 'WAITING_FOR_ALLOCATION',
+        registered: true,
+        cbtStatus: 'WAITING_FOR_ALLOCATION',
+        assigned: false,
+        isDobVerified: false,
+        pcHostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+        cbtCode: reg?.cbtCode || cleanCbtCode || null,
+        institution: institutionPayload,
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+        remainingSeconds: 0,
+        message: 'Assigned student record could not be found. Please reallocate candidate.',
+      };
+    }
+
+    // 6. Find Examination & Question Paper
+    let exam = reg?.exam;
+    if (!exam && reg?.examId) {
+      exam = await this.prisma.exam.findUnique({
+        where: { id: reg.examId },
+        include: {
+          session: true,
+          questionPaper: {
+            include: {
+              questions: {
+                orderBy: { orderIndex: 'asc' },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!exam && (reg?.cbtCode || cleanCbtCode)) {
+      exam = await this.prisma.exam.findFirst({
+        where: {
+          OR: [
+            { cbtCode: reg?.cbtCode || cleanCbtCode },
+            { status: 'ACTIVE' },
+          ],
+        },
+        include: {
+          session: true,
+          questionPaper: {
+            include: {
+              questions: {
+                orderBy: { orderIndex: 'asc' },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    // Fallback if no exam found
+    if (!exam) {
+      exam = await this.prisma.exam.findFirst({
+        where: { status: { in: ['ACTIVE', 'SCHEDULED', 'DRAFT'] } },
+        include: {
+          session: true,
+          questionPaper: {
+            include: {
+              questions: {
+                orderBy: { orderIndex: 'asc' },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    // 7. Check Examination Scheduling
+    const startsAt = exam?.startsAt ? new Date(exam.startsAt) : null;
+    const endsAt = exam?.endsAt ? new Date(exam.endsAt) : null;
+
+    if (startsAt && now < startsAt && exam?.status === 'SCHEDULED') {
+      return {
+        status: 'EXAM_NOT_STARTED',
+        assignmentStatus: 'EXAM_NOT_STARTED',
+        registered: true,
+        cbtStatus: 'ALLOCATED',
+        assigned: true,
+        isDobVerified: reg?.isDobVerified || false,
+        pcHostname: upperHost || reg?.pcHostname,
+        cbtCode: reg?.cbtCode || cleanCbtCode,
+        pc: {
+          hostname: upperHost || reg?.pcHostname,
+          labName: pc?.labName || 'Main Lab',
+          ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+          isOnline: pc?.status === 'ONLINE',
+        },
+        student: {
+          id: student.id,
+          name: student.name || student.username,
+          username: student.username,
+          regNumber: student.regNumber || student.rollNumber || student.username,
+          registrationNumber: student.regNumber || student.rollNumber || student.username,
+          semester: student.semester || 'Semester 1',
+          department: student.department?.name || student.departmentName || 'Computer Science',
+        },
+        exam: {
+          id: exam.id,
+          title: exam.title,
+          subject: exam.subject,
+          durationMinutes: exam.durationMinutes,
+          startsAt: startsAt.toISOString(),
+          startTime: startsAt.toISOString(),
+        },
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+        remainingSeconds: 0,
+        message: `Examination scheduled to commence at ${startsAt.toLocaleString()}.`,
+      };
+    }
+
+    if (endsAt && now > endsAt) {
+      return {
+        status: 'EXAM_ENDED',
+        assignmentStatus: 'EXAM_ENDED',
+        registered: true,
+        cbtStatus: 'COMPLETED',
+        assigned: true,
+        isDobVerified: reg?.isDobVerified || false,
+        pcHostname: upperHost || reg?.pcHostname,
+        cbtCode: reg?.cbtCode || cleanCbtCode,
+        pc: {
+          hostname: upperHost || reg?.pcHostname,
+          labName: pc?.labName || 'Main Lab',
+          ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+          isOnline: pc?.status === 'ONLINE',
+        },
+        student: {
+          id: student.id,
+          name: student.name || student.username,
+          username: student.username,
+          regNumber: student.regNumber || student.rollNumber || student.username,
+          registrationNumber: student.regNumber || student.rollNumber || student.username,
+        },
+        exam: exam ? {
+          id: exam.id,
+          title: exam.title,
+          subject: exam.subject,
+          endsAt: endsAt.toISOString(),
+          endTime: endsAt.toISOString(),
+        } : null,
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+        remainingSeconds: 0,
+        message: 'The examination testing window has concluded.',
+      };
+    }
+
+    // 8. Find or Create ExamAttempt for candidate
+    let attempt: any = null;
+    if (exam) {
+      attempt = await this.prisma.examAttempt.findFirst({
+        where: {
+          examId: exam.id,
+          studentId: student.id,
+        },
+        include: {
+          answers: true,
+        },
+        orderBy: { startedAt: 'desc' },
+      });
+
+      if (!attempt) {
+        const durationSec = (exam.durationMinutes || 60) * 60;
+        attempt = await this.prisma.examAttempt.create({
+          data: {
+            examId: exam.id,
+            studentId: student.id,
+            sessionId: reg?.sessionId || exam.sessionId || null,
+            pcHostname: upperHost || reg?.pcHostname || null,
+            status: 'IN_PROGRESS',
+            startedAt: now,
+            timeRemainingSeconds: durationSec,
+          },
+          include: {
+            answers: true,
+          },
+        });
+      }
+    }
+
+    // 9. Compute Server-Authoritative Timer
+    const durationMinutes = exam?.durationMinutes || 60;
+    const durationSeconds = durationMinutes * 60;
+    const attemptStartTime = attempt?.startedAt ? new Date(attempt.startedAt) : now;
+    const elapsedSeconds = Math.floor((now.getTime() - attemptStartTime.getTime()) / 1000);
+    let remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
+
+    if (attempt?.status === 'SUBMITTED' || attempt?.status === 'AUTO_SUBMITTED' || attempt?.status === 'EVALUATED') {
+      remainingSeconds = 0;
+    }
+
+    const examStartTime = attemptStartTime.toISOString();
+    const examEndTime = new Date(attemptStartTime.getTime() + durationSeconds * 1000).toISOString();
+
+    // 10. Format and Sanitize Questions (MCQ with 4 Options)
+    const savedAnswersMap = new Map();
+    if (attempt?.answers) {
+      for (const ans of attempt.answers) {
+        savedAnswersMap.set(ans.questionId, ans);
+      }
+    }
+
+    const rawQuestions = exam?.questionPaper?.questions || [];
+    const questions = rawQuestions.map((q: any, idx: number) => {
+      let rawOpts = q.options;
+      if (typeof rawOpts === 'string') {
+        try {
+          rawOpts = JSON.parse(rawOpts);
+        } catch {
+          rawOpts = [];
+        }
+      }
+
+      let formattedOptions: Array<{ id: string; text: string }> = [];
+      let optionList: string[] = [];
+
+      if (Array.isArray(rawOpts)) {
+        formattedOptions = rawOpts.map((opt: any, optIdx: number) => {
+          const label = String.fromCharCode(65 + optIdx); // A, B, C, D
+          if (typeof opt === 'string') {
+            optionList.push(opt);
+            return { id: label, text: opt };
+          }
+          if (opt && typeof opt === 'object') {
+            const id = opt.id || label;
+            const text = opt.text || opt.label || String(opt);
+            optionList.push(text);
+            return { id, text };
+          }
+          const textStr = String(opt);
+          optionList.push(textStr);
+          return { id: label, text: textStr };
+        });
+      }
+
+      // Default fallback to 4 options if empty
+      if (formattedOptions.length === 0) {
+        formattedOptions = [
+          { id: 'A', text: 'Option A' },
+          { id: 'B', text: 'Option B' },
+          { id: 'C', text: 'Option C' },
+          { id: 'D', text: 'Option D' },
+        ];
+        optionList = ['Option A', 'Option B', 'Option C', 'Option D'];
+      }
+
+      const saved = savedAnswersMap.get(q.id);
+
+      return {
+        id: q.id,
+        questionId: q.id,
+        question: q.questionText,
+        questionText: q.questionText,
+        questionType: q.questionType || 'MCQ',
+        section: q.section || 'General',
+        orderIndex: q.orderIndex !== undefined ? q.orderIndex : idx + 1,
+        marks: q.marks || 1.0,
+        negativeMarks: q.negativeMarks || 0.0,
+        imageUrl: q.imageUrl || null,
+        options: formattedOptions,
+        optionList,
+        savedOption: saved?.selectedOption || null,
+        savedAnswer: saved?.selectedOption || null,
+        isMarkedForReview: saved?.isMarkedForReview || false,
+      };
+    });
+
+    // 11. Final Status Resolution
+    let finalStatus = 'READY';
+    if (attempt?.status === 'SUBMITTED' || attempt?.status === 'AUTO_SUBMITTED' || attempt?.status === 'EVALUATED') {
+      finalStatus = 'EXAM_ENDED';
+    } else if (remainingSeconds <= 0) {
+      finalStatus = 'TIME_UP';
     }
 
     return {
-      registered: !!reg,
-      cbtCode: reg?.cbtCode || null,
-      pcHostname: upperHost,
+      status: finalStatus,
+      assignmentStatus: finalStatus,
+      cbtStatus: reg?.isDobVerified ? 'EXAM_READY' : 'ALLOCATED',
+      registered: true,
+      assigned: true,
+      isDobVerified: reg?.isDobVerified || false,
+      candidateVerificationRequired: !reg?.isDobVerified,
+      pcHostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+      cbtCode: reg?.cbtCode || cleanCbtCode || 'CBT_SESSION',
       pcRegistrationId: reg?.id || null,
-      cbtStatus: pc?.cbtStatus || computedStatus,
-      assigned: isAssigned,
-      isDobVerified: isVerified,
-      candidateVerificationRequired: isAssigned && !isVerified,
-      institution: branding ? {
-        name: branding.name,
-        code: branding.code,
-        board: branding.board,
-        location: branding.location,
-        logoUrl: branding.logoUrl,
-      } : null,
-      session: reg?.exam?.session ? {
-        id: reg.exam.session.id,
-        sessionCode: reg.exam.session.sessionCode,
-        classTitle: reg.exam.session.classTitle,
-        durationMinutes: reg.exam.session.durationMinutes,
-      } : null,
-      exam: reg?.exam ? {
-        id: reg.exam.id,
-        title: reg.exam.title,
-        subject: reg.exam.subject,
-        durationMinutes: reg.exam.durationMinutes,
-        totalMarks: reg.exam.totalMarks,
-        passingMarks: reg.exam.passingMarks,
-        questionCount: reg.exam.questionPaper?._count?.questions || 0,
-      } : null,
-      student: student ? {
+      serverTime: now.toISOString(),
+      serverCurrentTime: now.getTime(),
+      remainingSeconds,
+
+      pc: {
+        hostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+        labName: pc?.labName || 'Main Lab',
+        ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+        isOnline: pc?.status === 'ONLINE',
+        lastSeen: pc?.lastSeen || null,
+      },
+
+      student: {
         id: student.id,
         name: student.name || student.username,
+        username: student.username,
         regNumber: student.regNumber || student.rollNumber || student.username,
-        dateOfBirth: student.dateOfBirth,
+        registrationNumber: student.regNumber || student.rollNumber || student.username,
+        dateOfBirth: student.dateOfBirth || null,
+        classId: student.classId || 'Standard',
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'Computer Science & Engineering',
-      } : null,
+        email: student.email || null,
+      },
+
+      exam: exam
+        ? {
+            id: exam.id,
+            title: exam.title,
+            subject: exam.subject,
+            description: exam.description || null,
+            instructions: exam.instructions || 'Answer all questions carefully. Timer is synced with the server.',
+            durationMinutes: exam.durationMinutes,
+            totalMarks: exam.totalMarks,
+            passingMarks: exam.passingMarks,
+            totalQuestions: questions.length,
+            startTime: examStartTime,
+            endTime: examEndTime,
+            startsAt: exam.startsAt,
+            endsAt: exam.endsAt,
+            status: exam.status,
+          }
+        : null,
+
+      questionPaper: exam?.questionPaper
+        ? {
+            id: exam.questionPaper.id,
+            title: exam.questionPaper.title,
+            subject: exam.questionPaper.subject,
+            totalQuestions: questions.length,
+            questions,
+          }
+        : {
+            id: 'qp-default',
+            title: exam?.title || 'Examination Paper',
+            subject: exam?.subject || 'General Assessment',
+            totalQuestions: questions.length,
+            questions,
+          },
+
+      session: {
+        id: attempt?.id || 'session-default',
+        attemptId: attempt?.id || 'attempt-default',
+        sessionId: reg?.sessionId || exam?.sessionId || null,
+        cbtCode: reg?.cbtCode || cleanCbtCode,
+        status: finalStatus,
+        startedAt: examStartTime,
+        startTime: examStartTime,
+        endTime: examEndTime,
+        durationMinutes,
+        remainingSeconds,
+        serverTime: now.toISOString(),
+        serverCurrentTime: now.getTime(),
+      },
+
+      attempt: attempt
+        ? {
+            id: attempt.id,
+            status: attempt.status,
+            startedAt: attempt.startedAt,
+            timeRemainingSeconds: remainingSeconds,
+          }
+        : null,
+
+      institution: institutionPayload,
       invigilatorName: reg?.assignedInvigilatorName || 'Assigned Invigilator',
-      lastSeen: pc?.lastSeen || null,
-      isOnline: pc?.status === 'ONLINE',
     };
   }
 

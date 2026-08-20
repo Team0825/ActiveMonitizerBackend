@@ -15,6 +15,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CbtService } from './cbt.service';
 import {
   AllocateStudentDto,
+  AutoAllocateStudentDto,
   AuthorityLoginDto,
   AuthorityPasswordDto,
   CorrectResultDto,
@@ -158,6 +159,16 @@ export class CbtController {
   }
 
   @UseGuards(RolesGuard)
+  @Post('auto-allocate')
+  @Roles('ADMIN', 'TEACHER')
+  autoAllocateStudent(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: AutoAllocateStudentDto,
+  ) {
+    return this.cbtService.autoAllocateStudent(req.user.sub, dto);
+  }
+
+  @UseGuards(RolesGuard)
   @Post('deallocate-student')
   @Roles('ADMIN', 'TEACHER')
   deallocateStudent(
@@ -172,9 +183,27 @@ export class CbtController {
     return this.cbtService.verifyDob(dto);
   }
 
+  @Get('student/cbt')
+  getStudentCbt(
+    @Query('cbtCode') cbtCode?: string,
+    @Query('session') session?: string,
+    @Query('pc') pc?: string,
+    @Query('pcHostname') pcHostname?: string,
+  ) {
+    return this.cbtService.getStudentCbtExamination({
+      cbtCode: cbtCode || session || '',
+      pcHostname: pc || pcHostname || '',
+    });
+  }
+
   @Get('pc-allocation')
-  getPcAllocation(@Query('pcHostname') pcHostname: string) {
-    return this.cbtService.getPcAllocation(pcHostname);
+  getPcAllocation(
+    @Query('pcHostname') pcHostname?: string,
+    @Query('pc') pc?: string,
+    @Query('cbtCode') cbtCode?: string,
+    @Query('session') session?: string,
+  ) {
+    return this.cbtService.getPcAllocation(pcHostname || pc, cbtCode || session);
   }
 
   @Post('terminate-pc')

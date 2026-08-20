@@ -395,6 +395,32 @@ export class AllocateStudentDto {
   invigilatorName?: string;
 }
 
+export class AutoAllocateStudentDto {
+  @IsString()
+  @IsNotEmpty()
+  studentId: string;
+
+  @IsOptional()
+  @IsString()
+  examId?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+
+  @IsOptional()
+  @IsString()
+  cbtCode?: string;
+
+  @IsOptional()
+  @IsString()
+  invigilatorId?: string;
+
+  @IsOptional()
+  @IsString()
+  invigilatorName?: string;
+}
+
 export class DeallocateStudentDto {
   @IsString()
   @IsNotEmpty()
