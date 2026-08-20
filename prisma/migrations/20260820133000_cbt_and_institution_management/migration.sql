@@ -1,34 +1,34 @@
--- AlterTable
-ALTER TABLE "User" ADD COLUMN     "dateOfBirth" TEXT,
-ADD COLUMN     "departmentId" TEXT,
-ADD COLUMN     "departmentName" TEXT,
-ADD COLUMN     "institutionId" TEXT,
-ADD COLUMN     "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "lastActiveAt" TIMESTAMP(3),
-ADD COLUMN     "lastLoginAt" TIMESTAMP(3),
-ADD COLUMN     "semester" TEXT;
+-- AlterTable User
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dateOfBirth" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "departmentId" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "departmentName" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "institutionId" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastActiveAt" TIMESTAMP(3);
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP(3);
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "semester" TEXT;
 
--- AlterTable
-ALTER TABLE "ClassSession" ADD COLUMN     "activityMonitoring" BOOLEAN NOT NULL DEFAULT true,
-ADD COLUMN     "activitySensitivity" TEXT NOT NULL DEFAULT 'NORMAL',
-ADD COLUMN     "activityUpdateInterval" INTEGER NOT NULL DEFAULT 2,
-ADD COLUMN     "cbtCode" TEXT,
-ADD COLUMN     "connectivityMode" TEXT NOT NULL DEFAULT 'HYBRID',
-ADD COLUMN     "idleThresholdSeconds" INTEGER NOT NULL DEFAULT 10,
-ADD COLUMN     "institutionId" TEXT,
-ADD COLUMN     "violationSensitivity" TEXT NOT NULL DEFAULT 'NORMAL',
-ADD COLUMN     "websiteAccessMode" TEXT NOT NULL DEFAULT 'NORMAL';
+-- AlterTable ClassSession
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "activityMonitoring" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "activitySensitivity" TEXT NOT NULL DEFAULT 'NORMAL';
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "activityUpdateInterval" INTEGER NOT NULL DEFAULT 2;
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "cbtCode" TEXT;
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "connectivityMode" TEXT NOT NULL DEFAULT 'HYBRID';
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "idleThresholdSeconds" INTEGER NOT NULL DEFAULT 10;
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "institutionId" TEXT;
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "violationSensitivity" TEXT NOT NULL DEFAULT 'NORMAL';
+ALTER TABLE "ClassSession" ADD COLUMN IF NOT EXISTS "websiteAccessMode" TEXT NOT NULL DEFAULT 'NORMAL';
 
--- AlterTable
-ALTER TABLE "Pc" ADD COLUMN     "assignedInvigilatorId" TEXT,
-ADD COLUMN     "assignedStudentId" TEXT,
-ADD COLUMN     "cbtStatus" TEXT NOT NULL DEFAULT 'IDLE',
-ADD COLUMN     "emergencyTerminationEnabled" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "institutionId" TEXT,
-ADD COLUMN     "osArchitecture" TEXT;
+-- AlterTable Pc
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "assignedInvigilatorId" TEXT;
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "assignedStudentId" TEXT;
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "cbtStatus" TEXT NOT NULL DEFAULT 'IDLE';
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "emergencyTerminationEnabled" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "institutionId" TEXT;
+ALTER TABLE "Pc" ADD COLUMN IF NOT EXISTS "osArchitecture" TEXT;
 
--- CreateTable
-CREATE TABLE "QuestionPaper" (
+-- CreateTable QuestionPaper
+CREATE TABLE IF NOT EXISTS "QuestionPaper" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "subject" TEXT NOT NULL,
@@ -37,13 +37,13 @@ CREATE TABLE "QuestionPaper" (
     "passingMarks" DOUBLE PRECISION NOT NULL DEFAULT 40.0,
     "createdById" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "QuestionPaper_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "Question" (
+-- CreateTable Question
+CREATE TABLE IF NOT EXISTS "Question" (
     "id" TEXT NOT NULL,
     "questionPaperId" TEXT NOT NULL,
     "questionText" TEXT NOT NULL,
@@ -57,13 +57,13 @@ CREATE TABLE "Question" (
     "explanation" TEXT,
     "imageUrl" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Question_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "Exam" (
+-- CreateTable Exam
+CREATE TABLE IF NOT EXISTS "Exam" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "subject" TEXT NOT NULL,
@@ -90,13 +90,13 @@ CREATE TABLE "Exam" (
     "endsAt" TIMESTAMP(3),
     "institutionId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Exam_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ExamAttempt" (
+-- CreateTable ExamAttempt
+CREATE TABLE IF NOT EXISTS "ExamAttempt" (
     "id" TEXT NOT NULL,
     "examId" TEXT NOT NULL,
     "studentId" TEXT NOT NULL,
@@ -108,13 +108,13 @@ CREATE TABLE "ExamAttempt" (
     "clientIp" TEXT,
     "timeRemainingSeconds" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ExamAttempt_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ExamAnswer" (
+-- CreateTable ExamAnswer
+CREATE TABLE IF NOT EXISTS "ExamAnswer" (
     "id" TEXT NOT NULL,
     "attemptId" TEXT NOT NULL,
     "questionId" TEXT NOT NULL,
@@ -129,8 +129,8 @@ CREATE TABLE "ExamAnswer" (
     CONSTRAINT "ExamAnswer_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ExamResult" (
+-- CreateTable ExamResult
+CREATE TABLE IF NOT EXISTS "ExamResult" (
     "id" TEXT NOT NULL,
     "examId" TEXT NOT NULL,
     "attemptId" TEXT NOT NULL,
@@ -150,13 +150,13 @@ CREATE TABLE "ExamResult" (
     "evaluatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publishedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ExamResult_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "CbtPcRegistration" (
+-- CreateTable CbtPcRegistration
+CREATE TABLE IF NOT EXISTS "CbtPcRegistration" (
     "id" TEXT NOT NULL,
     "examId" TEXT,
     "sessionId" TEXT,
@@ -171,24 +171,32 @@ CREATE TABLE "CbtPcRegistration" (
     "isDobVerified" BOOLEAN NOT NULL DEFAULT false,
     "status" TEXT NOT NULL DEFAULT 'REGISTERED',
     "registeredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "CbtPcRegistration_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "AuthoritySetting" (
+-- AlterTable CbtPcRegistration columns if table previously existed
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "assignedStudentId" TEXT;
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "assignedStudentName" TEXT;
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "assignedStudentRegNo" TEXT;
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "assignedInvigilatorId" TEXT;
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "assignedInvigilatorName" TEXT;
+ALTER TABLE "CbtPcRegistration" ADD COLUMN IF NOT EXISTS "isDobVerified" BOOLEAN NOT NULL DEFAULT false;
+
+-- CreateTable AuthoritySetting
+CREATE TABLE IF NOT EXISTS "AuthoritySetting" (
     "id" TEXT NOT NULL,
     "key" TEXT NOT NULL DEFAULT 'AUTHORITY_PASSWORD',
     "passwordHash" TEXT NOT NULL,
     "updatedById" TEXT,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuthoritySetting_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ResultCorrectionAudit" (
+-- CreateTable ResultCorrectionAudit
+CREATE TABLE IF NOT EXISTS "ResultCorrectionAudit" (
     "id" TEXT NOT NULL,
     "examResultId" TEXT NOT NULL,
     "examId" TEXT NOT NULL,
@@ -204,8 +212,8 @@ CREATE TABLE "ResultCorrectionAudit" (
     CONSTRAINT "ResultCorrectionAudit_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "CbtRegistrationCode" (
+-- CreateTable CbtRegistrationCode
+CREATE TABLE IF NOT EXISTS "CbtRegistrationCode" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "createdById" TEXT NOT NULL,
@@ -218,8 +226,8 @@ CREATE TABLE "CbtRegistrationCode" (
     CONSTRAINT "CbtRegistrationCode_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "Institution" (
+-- CreateTable Institution
+CREATE TABLE IF NOT EXISTS "Institution" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -228,13 +236,13 @@ CREATE TABLE "Institution" (
     "logoUrl" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Institution_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "Department" (
+-- CreateTable Department
+CREATE TABLE IF NOT EXISTS "Department" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -242,13 +250,13 @@ CREATE TABLE "Department" (
     "institutionId" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Department_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "License" (
+-- CreateTable License
+CREATE TABLE IF NOT EXISTS "License" (
     "id" TEXT NOT NULL,
     "licenseNumber" TEXT NOT NULL,
     "activationKey" TEXT NOT NULL,
@@ -264,13 +272,13 @@ CREATE TABLE "License" (
     "lastValidatedAt" TIMESTAMP(3),
     "serverSignature" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "License_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "AppTheme" (
+-- CreateTable AppTheme
+CREATE TABLE IF NOT EXISTS "AppTheme" (
     "id" TEXT NOT NULL,
     "targetInterface" TEXT NOT NULL DEFAULT 'GLOBAL',
     "themeName" TEXT NOT NULL,
@@ -299,247 +307,137 @@ CREATE TABLE "AppTheme" (
     "institutionId" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AppTheme_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX "QuestionPaper_createdById_idx" ON "QuestionPaper"("createdById");
-
--- CreateIndex
-CREATE INDEX "QuestionPaper_subject_idx" ON "QuestionPaper"("subject");
-
--- CreateIndex
-CREATE INDEX "Question_questionPaperId_idx" ON "Question"("questionPaperId");
-
--- CreateIndex
-CREATE INDEX "Question_orderIndex_idx" ON "Question"("orderIndex");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Exam_cbtCode_key" ON "Exam"("cbtCode");
-
--- CreateIndex
-CREATE INDEX "Exam_questionPaperId_idx" ON "Exam"("questionPaperId");
-
--- CreateIndex
-CREATE INDEX "Exam_sessionId_idx" ON "Exam"("sessionId");
-
--- CreateIndex
-CREATE INDEX "Exam_createdById_idx" ON "Exam"("createdById");
-
--- CreateIndex
-CREATE INDEX "Exam_status_idx" ON "Exam"("status");
-
--- CreateIndex
-CREATE INDEX "Exam_cbtCode_idx" ON "Exam"("cbtCode");
-
--- CreateIndex
-CREATE INDEX "Exam_institutionId_idx" ON "Exam"("institutionId");
-
--- CreateIndex
-CREATE INDEX "ExamAttempt_examId_idx" ON "ExamAttempt"("examId");
-
--- CreateIndex
-CREATE INDEX "ExamAttempt_studentId_idx" ON "ExamAttempt"("studentId");
-
--- CreateIndex
-CREATE INDEX "ExamAttempt_status_idx" ON "ExamAttempt"("status");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExamAttempt_examId_studentId_key" ON "ExamAttempt"("examId", "studentId");
-
--- CreateIndex
-CREATE INDEX "ExamAnswer_attemptId_idx" ON "ExamAnswer"("attemptId");
-
--- CreateIndex
-CREATE INDEX "ExamAnswer_questionId_idx" ON "ExamAnswer"("questionId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExamAnswer_attemptId_questionId_key" ON "ExamAnswer"("attemptId", "questionId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExamResult_attemptId_key" ON "ExamResult"("attemptId");
-
--- CreateIndex
-CREATE INDEX "ExamResult_examId_idx" ON "ExamResult"("examId");
-
--- CreateIndex
-CREATE INDEX "ExamResult_studentId_idx" ON "ExamResult"("studentId");
-
--- CreateIndex
-CREATE INDEX "ExamResult_status_idx" ON "ExamResult"("status");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ExamResult_examId_studentId_key" ON "ExamResult"("examId", "studentId");
-
--- CreateIndex
-CREATE INDEX "CbtPcRegistration_cbtCode_idx" ON "CbtPcRegistration"("cbtCode");
-
--- CreateIndex
-CREATE INDEX "CbtPcRegistration_sessionId_idx" ON "CbtPcRegistration"("sessionId");
-
--- CreateIndex
-CREATE INDEX "CbtPcRegistration_examId_idx" ON "CbtPcRegistration"("examId");
-
--- CreateIndex
-CREATE INDEX "CbtPcRegistration_pcHostname_idx" ON "CbtPcRegistration"("pcHostname");
-
--- CreateIndex
-CREATE UNIQUE INDEX "CbtPcRegistration_cbtCode_pcHostname_key" ON "CbtPcRegistration"("cbtCode", "pcHostname");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AuthoritySetting_key_key" ON "AuthoritySetting"("key");
-
--- CreateIndex
-CREATE INDEX "ResultCorrectionAudit_examResultId_idx" ON "ResultCorrectionAudit"("examResultId");
-
--- CreateIndex
-CREATE INDEX "ResultCorrectionAudit_examId_idx" ON "ResultCorrectionAudit"("examId");
-
--- CreateIndex
-CREATE INDEX "ResultCorrectionAudit_studentId_idx" ON "ResultCorrectionAudit"("studentId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "CbtRegistrationCode_code_key" ON "CbtRegistrationCode"("code");
-
--- CreateIndex
-CREATE INDEX "CbtRegistrationCode_code_idx" ON "CbtRegistrationCode"("code");
-
--- CreateIndex
-CREATE INDEX "CbtRegistrationCode_isUsed_idx" ON "CbtRegistrationCode"("isUsed");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Institution_code_key" ON "Institution"("code");
-
--- CreateIndex
-CREATE INDEX "Institution_code_idx" ON "Institution"("code");
-
--- CreateIndex
-CREATE INDEX "Institution_isActive_idx" ON "Institution"("isActive");
-
--- CreateIndex
-CREATE INDEX "Department_institutionId_idx" ON "Department"("institutionId");
-
--- CreateIndex
-CREATE INDEX "Department_isActive_idx" ON "Department"("isActive");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Department_institutionId_name_key" ON "Department"("institutionId", "name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Department_institutionId_code_key" ON "Department"("institutionId", "code");
-
--- CreateIndex
-CREATE UNIQUE INDEX "License_licenseNumber_key" ON "License"("licenseNumber");
-
--- CreateIndex
-CREATE UNIQUE INDEX "License_activationKey_key" ON "License"("activationKey");
-
--- CreateIndex
-CREATE INDEX "License_licenseNumber_idx" ON "License"("licenseNumber");
-
--- CreateIndex
-CREATE INDEX "License_activationKey_idx" ON "License"("activationKey");
-
--- CreateIndex
-CREATE INDEX "License_institutionId_idx" ON "License"("institutionId");
-
--- CreateIndex
-CREATE INDEX "License_machineFingerprint_idx" ON "License"("machineFingerprint");
-
--- CreateIndex
-CREATE INDEX "License_status_idx" ON "License"("status");
-
--- CreateIndex
-CREATE INDEX "AppTheme_targetInterface_idx" ON "AppTheme"("targetInterface");
-
--- CreateIndex
-CREATE INDEX "AppTheme_isActive_idx" ON "AppTheme"("isActive");
-
--- CreateIndex
-CREATE INDEX "User_institutionId_idx" ON "User"("institutionId");
-
--- CreateIndex
-CREATE INDEX "User_departmentId_idx" ON "User"("departmentId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ClassSession_cbtCode_key" ON "ClassSession"("cbtCode");
-
--- CreateIndex
-CREATE INDEX "ClassSession_cbtCode_idx" ON "ClassSession"("cbtCode");
-
--- CreateIndex
-CREATE INDEX "ClassSession_institutionId_idx" ON "ClassSession"("institutionId");
-
--- CreateIndex
-CREATE INDEX "Pc_lastSeen_idx" ON "Pc"("lastSeen");
-
--- CreateIndex
-CREATE INDEX "Pc_institutionId_idx" ON "Pc"("institutionId");
-
--- AddForeignKey
-ALTER TABLE "User" ADD CONSTRAINT "User_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "User" ADD CONSTRAINT "User_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ClassSession" ADD CONSTRAINT "ClassSession_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Pc" ADD CONSTRAINT "Pc_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "QuestionPaper" ADD CONSTRAINT "QuestionPaper_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Question" ADD CONSTRAINT "Question_questionPaperId_fkey" FOREIGN KEY ("questionPaperId") REFERENCES "QuestionPaper"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Exam" ADD CONSTRAINT "Exam_questionPaperId_fkey" FOREIGN KEY ("questionPaperId") REFERENCES "QuestionPaper"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Exam" ADD CONSTRAINT "Exam_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "ClassSession"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Exam" ADD CONSTRAINT "Exam_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Exam" ADD CONSTRAINT "Exam_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamAnswer" ADD CONSTRAINT "ExamAnswer_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExamAttempt"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamAnswer" ADD CONSTRAINT "ExamAnswer_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "Question"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExamAttempt"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "CbtPcRegistration" ADD CONSTRAINT "CbtPcRegistration_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "ResultCorrectionAudit" ADD CONSTRAINT "ResultCorrectionAudit_examResultId_fkey" FOREIGN KEY ("examResultId") REFERENCES "ExamResult"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Department" ADD CONSTRAINT "Department_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "License" ADD CONSTRAINT "License_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AppTheme" ADD CONSTRAINT "AppTheme_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE INDEX IF NOT EXISTS "QuestionPaper_createdById_idx" ON "QuestionPaper"("createdById");
+CREATE INDEX IF NOT EXISTS "QuestionPaper_subject_idx" ON "QuestionPaper"("subject");
+CREATE INDEX IF NOT EXISTS "Question_questionPaperId_idx" ON "Question"("questionPaperId");
+CREATE INDEX IF NOT EXISTS "Question_orderIndex_idx" ON "Question"("orderIndex");
+CREATE UNIQUE INDEX IF NOT EXISTS "Exam_cbtCode_key" ON "Exam"("cbtCode");
+CREATE INDEX IF NOT EXISTS "Exam_questionPaperId_idx" ON "Exam"("questionPaperId");
+CREATE INDEX IF NOT EXISTS "Exam_sessionId_idx" ON "Exam"("sessionId");
+CREATE INDEX IF NOT EXISTS "Exam_createdById_idx" ON "Exam"("createdById");
+CREATE INDEX IF NOT EXISTS "Exam_status_idx" ON "Exam"("status");
+CREATE INDEX IF NOT EXISTS "Exam_cbtCode_idx" ON "Exam"("cbtCode");
+CREATE INDEX IF NOT EXISTS "Exam_institutionId_idx" ON "Exam"("institutionId");
+CREATE INDEX IF NOT EXISTS "ExamAttempt_examId_idx" ON "ExamAttempt"("examId");
+CREATE INDEX IF NOT EXISTS "ExamAttempt_studentId_idx" ON "ExamAttempt"("studentId");
+CREATE INDEX IF NOT EXISTS "ExamAttempt_status_idx" ON "ExamAttempt"("status");
+CREATE UNIQUE INDEX IF NOT EXISTS "ExamAttempt_examId_studentId_key" ON "ExamAttempt"("examId", "studentId");
+CREATE INDEX IF NOT EXISTS "ExamAnswer_attemptId_idx" ON "ExamAnswer"("attemptId");
+CREATE INDEX IF NOT EXISTS "ExamAnswer_questionId_idx" ON "ExamAnswer"("questionId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ExamAnswer_attemptId_questionId_key" ON "ExamAnswer"("attemptId", "questionId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ExamResult_attemptId_key" ON "ExamResult"("attemptId");
+CREATE INDEX IF NOT EXISTS "ExamResult_examId_idx" ON "ExamResult"("examId");
+CREATE INDEX IF NOT EXISTS "ExamResult_studentId_idx" ON "ExamResult"("studentId");
+CREATE INDEX IF NOT EXISTS "ExamResult_status_idx" ON "ExamResult"("status");
+CREATE UNIQUE INDEX IF NOT EXISTS "ExamResult_examId_studentId_key" ON "ExamResult"("examId", "studentId");
+CREATE INDEX IF NOT EXISTS "CbtPcRegistration_cbtCode_idx" ON "CbtPcRegistration"("cbtCode");
+CREATE INDEX IF NOT EXISTS "CbtPcRegistration_sessionId_idx" ON "CbtPcRegistration"("sessionId");
+CREATE INDEX IF NOT EXISTS "CbtPcRegistration_examId_idx" ON "CbtPcRegistration"("examId");
+CREATE INDEX IF NOT EXISTS "CbtPcRegistration_pcHostname_idx" ON "CbtPcRegistration"("pcHostname");
+CREATE UNIQUE INDEX IF NOT EXISTS "CbtPcRegistration_cbtCode_pcHostname_key" ON "CbtPcRegistration"("cbtCode", "pcHostname");
+CREATE UNIQUE INDEX IF NOT EXISTS "AuthoritySetting_key_key" ON "AuthoritySetting"("key");
+CREATE INDEX IF NOT EXISTS "ResultCorrectionAudit_examResultId_idx" ON "ResultCorrectionAudit"("examResultId");
+CREATE INDEX IF NOT EXISTS "ResultCorrectionAudit_examId_idx" ON "ResultCorrectionAudit"("examId");
+CREATE INDEX IF NOT EXISTS "ResultCorrectionAudit_studentId_idx" ON "ResultCorrectionAudit"("studentId");
+CREATE UNIQUE INDEX IF NOT EXISTS "CbtRegistrationCode_code_key" ON "CbtRegistrationCode"("code");
+CREATE INDEX IF NOT EXISTS "CbtRegistrationCode_code_idx" ON "CbtRegistrationCode"("code");
+CREATE INDEX IF NOT EXISTS "CbtRegistrationCode_isUsed_idx" ON "CbtRegistrationCode"("isUsed");
+CREATE UNIQUE INDEX IF NOT EXISTS "Institution_code_key" ON "Institution"("code");
+CREATE INDEX IF NOT EXISTS "Institution_code_idx" ON "Institution"("code");
+CREATE INDEX IF NOT EXISTS "Institution_isActive_idx" ON "Institution"("isActive");
+CREATE INDEX IF NOT EXISTS "Department_institutionId_idx" ON "Department"("institutionId");
+CREATE INDEX IF NOT EXISTS "Department_isActive_idx" ON "Department"("isActive");
+CREATE UNIQUE INDEX IF NOT EXISTS "Department_institutionId_name_key" ON "Department"("institutionId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Department_institutionId_code_key" ON "Department"("institutionId", "code");
+CREATE UNIQUE INDEX IF NOT EXISTS "License_licenseNumber_key" ON "License"("licenseNumber");
+CREATE UNIQUE INDEX IF NOT EXISTS "License_activationKey_key" ON "License"("activationKey");
+CREATE INDEX IF NOT EXISTS "License_licenseNumber_idx" ON "License"("licenseNumber");
+CREATE INDEX IF NOT EXISTS "License_activationKey_idx" ON "License"("activationKey");
+CREATE INDEX IF NOT EXISTS "License_institutionId_idx" ON "License"("institutionId");
+CREATE INDEX IF NOT EXISTS "License_machineFingerprint_idx" ON "License"("machineFingerprint");
+CREATE INDEX IF NOT EXISTS "License_status_idx" ON "License"("status");
+CREATE INDEX IF NOT EXISTS "AppTheme_targetInterface_idx" ON "AppTheme"("targetInterface");
+CREATE INDEX IF NOT EXISTS "AppTheme_isActive_idx" ON "AppTheme"("isActive");
+CREATE INDEX IF NOT EXISTS "User_institutionId_idx" ON "User"("institutionId");
+CREATE INDEX IF NOT EXISTS "User_departmentId_idx" ON "User"("departmentId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ClassSession_cbtCode_key" ON "ClassSession"("cbtCode");
+CREATE INDEX IF NOT EXISTS "ClassSession_cbtCode_idx" ON "ClassSession"("cbtCode");
+CREATE INDEX IF NOT EXISTS "ClassSession_institutionId_idx" ON "ClassSession"("institutionId");
+CREATE INDEX IF NOT EXISTS "Pc_lastSeen_idx" ON "Pc"("lastSeen");
+CREATE INDEX IF NOT EXISTS "Pc_institutionId_idx" ON "Pc"("institutionId");
+
+-- AddForeignKeys safely
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_institutionId_fkey') THEN
+        ALTER TABLE "User" ADD CONSTRAINT "User_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'User_departmentId_fkey') THEN
+        ALTER TABLE "User" ADD CONSTRAINT "User_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ClassSession_institutionId_fkey') THEN
+        ALTER TABLE "ClassSession" ADD CONSTRAINT "ClassSession_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Pc_institutionId_fkey') THEN
+        ALTER TABLE "Pc" ADD CONSTRAINT "Pc_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'QuestionPaper_createdById_fkey') THEN
+        ALTER TABLE "QuestionPaper" ADD CONSTRAINT "QuestionPaper_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Question_questionPaperId_fkey') THEN
+        ALTER TABLE "Question" ADD CONSTRAINT "Question_questionPaperId_fkey" FOREIGN KEY ("questionPaperId") REFERENCES "QuestionPaper"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Exam_questionPaperId_fkey') THEN
+        ALTER TABLE "Exam" ADD CONSTRAINT "Exam_questionPaperId_fkey" FOREIGN KEY ("questionPaperId") REFERENCES "QuestionPaper"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Exam_sessionId_fkey') THEN
+        ALTER TABLE "Exam" ADD CONSTRAINT "Exam_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "ClassSession"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Exam_createdById_fkey') THEN
+        ALTER TABLE "Exam" ADD CONSTRAINT "Exam_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Exam_institutionId_fkey') THEN
+        ALTER TABLE "Exam" ADD CONSTRAINT "Exam_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamAttempt_examId_fkey') THEN
+        ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamAttempt_studentId_fkey') THEN
+        ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamAnswer_attemptId_fkey') THEN
+        ALTER TABLE "ExamAnswer" ADD CONSTRAINT "ExamAnswer_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExamAttempt"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamAnswer_questionId_fkey') THEN
+        ALTER TABLE "ExamAnswer" ADD CONSTRAINT "ExamAnswer_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "Question"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamResult_examId_fkey') THEN
+        ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamResult_attemptId_fkey') THEN
+        ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_attemptId_fkey" FOREIGN KEY ("attemptId") REFERENCES "ExamAttempt"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ExamResult_studentId_fkey') THEN
+        ALTER TABLE "ExamResult" ADD CONSTRAINT "ExamResult_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'CbtPcRegistration_examId_fkey') THEN
+        ALTER TABLE "CbtPcRegistration" ADD CONSTRAINT "CbtPcRegistration_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ResultCorrectionAudit_examResultId_fkey') THEN
+        ALTER TABLE "ResultCorrectionAudit" ADD CONSTRAINT "ResultCorrectionAudit_examResultId_fkey" FOREIGN KEY ("examResultId") REFERENCES "ExamResult"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Department_institutionId_fkey') THEN
+        ALTER TABLE "Department" ADD CONSTRAINT "Department_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'License_institutionId_fkey') THEN
+        ALTER TABLE "License" ADD CONSTRAINT "License_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AppTheme_institutionId_fkey') THEN
+        ALTER TABLE "AppTheme" ADD CONSTRAINT "AppTheme_institutionId_fkey" FOREIGN KEY ("institutionId") REFERENCES "Institution"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;

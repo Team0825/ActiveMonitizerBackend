@@ -7,7 +7,12 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
-  app.enableCors(); // tighten to specific origins (dashboards) in production
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
+  });
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
   // eslint-disable-next-line no-console
