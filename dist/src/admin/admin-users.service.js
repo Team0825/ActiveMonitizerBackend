@@ -39,6 +39,8 @@ let AdminUsersService = class AdminUsersService {
                 mobile: dto.mobile?.trim() || null,
                 email: dto.email?.trim() || null,
                 classId: dto.classId?.trim() || null,
+                dateOfBirth: dto.dateOfBirth?.trim() || null,
+                semester: dto.semester?.trim() || null,
                 departmentId: dto.departmentId || null,
                 institutionId: institutionId || null,
                 createdById: adminId,
@@ -154,6 +156,10 @@ let AdminUsersService = class AdminUsersService {
             data.email = dto.email.trim() || null;
         if (dto.classId !== undefined)
             data.classId = dto.classId.trim() || null;
+        if (dto.dateOfBirth !== undefined)
+            data.dateOfBirth = dto.dateOfBirth.trim() || null;
+        if (dto.semester !== undefined)
+            data.semester = dto.semester.trim() || null;
         if (dto.departmentId !== undefined)
             data.departmentId = dto.departmentId || null;
         if (dto.institutionId !== undefined)
@@ -227,6 +233,8 @@ let AdminUsersService = class AdminUsersService {
             mobile: true,
             email: true,
             classId: true,
+            dateOfBirth: true,
+            semester: true,
             departmentId: true,
             department: {
                 select: {

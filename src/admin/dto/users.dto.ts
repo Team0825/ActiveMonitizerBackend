@@ -44,6 +44,14 @@ export class CreateStudentDto {
 
   @IsOptional()
   @IsString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  semester?: string;
+
+  @IsOptional()
+  @IsString()
   departmentId?: string;
 
   @IsOptional()
@@ -153,6 +161,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   classId?: string;
+
+  @IsOptional()
+  @IsString()
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  semester?: string;
 
   @IsOptional()
   @IsString()

@@ -30,6 +30,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -59,6 +61,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -88,6 +92,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -117,6 +123,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }[]>;
@@ -146,6 +154,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -198,6 +208,8 @@ export declare class AdminUsersService {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;

@@ -49,6 +49,8 @@ export class AdminUsersService {
         mobile: dto.mobile?.trim() || null,
         email: dto.email?.trim() || null,
         classId: dto.classId?.trim() || null,
+        dateOfBirth: dto.dateOfBirth?.trim() || null,
+        semester: dto.semester?.trim() || null,
         departmentId: dto.departmentId || null,
         institutionId: institutionId || null,
         createdById: adminId,
@@ -206,6 +208,8 @@ export class AdminUsersService {
     if (dto.mobile !== undefined) data.mobile = dto.mobile.trim() || null;
     if (dto.email !== undefined) data.email = dto.email.trim() || null;
     if (dto.classId !== undefined) data.classId = dto.classId.trim() || null;
+    if (dto.dateOfBirth !== undefined) data.dateOfBirth = dto.dateOfBirth.trim() || null;
+    if (dto.semester !== undefined) data.semester = dto.semester.trim() || null;
     if (dto.departmentId !== undefined) data.departmentId = dto.departmentId || null;
     if (dto.institutionId !== undefined) data.institutionId = dto.institutionId || null;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
@@ -301,6 +305,8 @@ export class AdminUsersService {
       mobile: true,
       email: true,
       classId: true,
+      dateOfBirth: true,
+      semester: true,
       departmentId: true,
       department: {
         select: {

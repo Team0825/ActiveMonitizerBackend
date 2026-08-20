@@ -908,7 +908,7 @@ export class CbtService {
       throw new BadRequestException('Both pcHostname and studentId are required for allocation.');
     }
 
-    // 1. Find Student
+    // 1. Find Student Record
     const student = await this.prisma.user.findFirst({
       where: {
         id: studentId,
@@ -921,7 +921,22 @@ export class CbtService {
       throw new NotFoundException(`Student record not found for ID: ${studentId}`);
     }
 
-    // 2. Find Invigilator (if provided)
+    // 2. Prevent candidate from being actively assigned to another PC
+    const existingAssignment = await this.prisma.cbtPcRegistration.findFirst({
+      where: {
+        assignedStudentId: student.id,
+        pcHostname: { not: pcHostname },
+        status: { in: ['ALLOCATED', 'EXAM_READY', 'EXAM_RUNNING', 'UNLOCKED'] },
+      },
+    });
+
+    if (existingAssignment) {
+      throw new ConflictException(
+        `Candidate "${student.name || student.username}" (${student.regNumber || student.username}) is already assigned to workstation ${existingAssignment.pcHostname}. Please release that workstation first.`,
+      );
+    }
+
+    // 3. Find Invigilator (if provided)
     let invigilator = null;
     if (dto.invigilatorId) {
       invigilator = await this.prisma.user.findFirst({
@@ -932,12 +947,31 @@ export class CbtService {
       });
     }
 
-    // 3. Find CbtPcRegistration or Pc
-    let reg = await this.prisma.cbtPcRegistration.findFirst({
-      where: { pcHostname },
-    });
+    // 4. Find CbtPcRegistration
+    let reg = null;
+    if (dto.pcRegistrationId) {
+      reg = await this.prisma.cbtPcRegistration.findUnique({
+        where: { id: dto.pcRegistrationId },
+      });
+    }
+    if (!reg) {
+      reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: {
+          pcHostname,
+          ...(dto.cbtCode ? { cbtCode: dto.cbtCode } : {}),
+        },
+        orderBy: { registeredAt: 'desc' },
+      });
+    }
+    if (!reg) {
+      reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { pcHostname },
+        orderBy: { registeredAt: 'desc' },
+      });
+    }
 
     const now = new Date();
+    const invigilatorName = invigilator?.name || invigilator?.username || dto.invigilatorName || null;
 
     if (reg) {
       reg = await this.prisma.cbtPcRegistration.update({
@@ -947,7 +981,7 @@ export class CbtService {
           assignedStudentName: student.name || student.username,
           assignedStudentRegNo: student.regNumber || student.rollNumber || student.username,
           assignedInvigilatorId: invigilator?.id || null,
-          assignedInvigilatorName: invigilator?.name || invigilator?.username || null,
+          assignedInvigilatorName: invigilatorName,
           examId: dto.examId || reg.examId,
           sessionId: dto.sessionId || reg.sessionId,
           isDobVerified: false,
@@ -957,7 +991,7 @@ export class CbtService {
       });
     }
 
-    // 4. Update PC record
+    // 5. Update PC record
     await this.prisma.pc.updateMany({
       where: { hostname: pcHostname },
       data: {
@@ -969,17 +1003,19 @@ export class CbtService {
       },
     });
 
-    // 5. Emit Socket.IO event to Agent, CBT Web Portal & Admin Dashboards
+    // 6. Emit Socket.IO event to Agent, CBT Web Portal & Admin Dashboards
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
       socketServer.emit('cbt:student-allocated', {
         pcHostname,
+        pcRegistrationId: reg?.id,
+        cbtCode: reg?.cbtCode,
         studentId: student.id,
         studentName: student.name || student.username,
         regNumber: student.regNumber || student.rollNumber || student.username,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'General',
-        invigilatorName: invigilator?.name || invigilator?.username || 'Assigned Invigilator',
+        invigilatorName: invigilatorName || 'Assigned Invigilator',
         cbtStatus: 'ALLOCATED',
         allocatedAt: now.toISOString(),
       });
@@ -990,18 +1026,24 @@ export class CbtService {
       });
     }
 
+    this.logger.log(
+      `[CBT] Student allocated: Candidate ${student.username} (${student.name}) -> PC ${pcHostname}`,
+    );
+
     return {
       success: true,
-      message: `Student ${student.name || student.username} successfully assigned to PC ${pcHostname}.`,
+      message: `Candidate ${student.name || student.username} successfully allocated to PC ${pcHostname}.`,
       allocation: {
         pcHostname,
+        pcRegistrationId: reg?.id,
+        cbtCode: reg?.cbtCode,
         studentId: student.id,
         studentName: student.name || student.username,
         regNumber: student.regNumber || student.rollNumber || student.username,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'General',
         invigilatorId: invigilator?.id || null,
-        invigilatorName: invigilator?.name || invigilator?.username || null,
+        invigilatorName: invigilatorName,
         cbtStatus: 'ALLOCATED',
         isDobVerified: false,
       },
@@ -1016,6 +1058,22 @@ export class CbtService {
     }
 
     const now = new Date();
+
+    if (dto.pcRegistrationId) {
+      await this.prisma.cbtPcRegistration.updateMany({
+        where: { id: dto.pcRegistrationId },
+        data: {
+          assignedStudentId: null,
+          assignedStudentName: null,
+          assignedStudentRegNo: null,
+          assignedInvigilatorId: null,
+          assignedInvigilatorName: null,
+          isDobVerified: false,
+          status: 'REGISTERED',
+          updatedAt: now,
+        },
+      });
+    }
 
     await this.prisma.cbtPcRegistration.updateMany({
       where: { pcHostname },
@@ -1051,9 +1109,11 @@ export class CbtService {
       socketServer.emit('cbt:pc-list-updated', { pcHostname });
     }
 
+    this.logger.log(`[CBT] Student deallocated from PC ${pcHostname}. Status reset to REGISTERED.`);
+
     return {
       success: true,
-      message: `Student deallocated from PC ${pcHostname}. PC returned to Idle state.`,
+      message: `Workstation ${pcHostname} released and returned to Waiting for Allocation.`,
       pcHostname,
       cbtStatus: 'REGISTERED',
     };
@@ -1103,7 +1163,7 @@ export class CbtService {
     });
 
     if (!reg || !reg.assignedStudentId) {
-      throw new BadRequestException('No student is currently assigned to this PC.');
+      throw new BadRequestException('No candidate is currently assigned to this workstation. Please wait for invigilator allocation.');
     }
 
     // 2. Find Student Record
@@ -1116,7 +1176,26 @@ export class CbtService {
       throw new NotFoundException('Assigned student record not found.');
     }
 
-    // 3. Verify Date of Birth
+    // 3. Candidate ID / Reg Number Match (if candidate supplied regNumber)
+    if (dto.regNumber && dto.regNumber.trim()) {
+      const inputReg = dto.regNumber.trim().toUpperCase();
+      const validIds = [
+        (student.regNumber || '').toUpperCase(),
+        (student.username || '').toUpperCase(),
+        (student.rollNumber || '').toUpperCase(),
+        student.id.toUpperCase(),
+      ];
+
+      if (!validIds.includes(inputReg)) {
+        return {
+          success: false,
+          verified: false,
+          message: 'Candidate Registration Number does not match the student allocated to this workstation.',
+        };
+      }
+    }
+
+    // 4. Verify Date of Birth
     const normalizeDob = (val: string) => {
       if (!val) return '';
       return val.replace(/[\/\-\.\s]/g, '').trim();
@@ -1139,6 +1218,7 @@ export class CbtService {
         } catch {}
       }
     } else {
+      // Legacy student record without DOB: record entered DOB and approve
       isMatch = true;
       await this.prisma.user.update({
         where: { id: student.id },
@@ -1154,13 +1234,13 @@ export class CbtService {
       };
     }
 
-    // 4. Mark Registration & PC as UNLOCKED
+    // 5. Mark Registration & PC as EXAM_READY / UNLOCKED
     const now = new Date();
     await this.prisma.cbtPcRegistration.update({
       where: { id: reg.id },
       data: {
         isDobVerified: true,
-        status: 'UNLOCKED',
+        status: 'EXAM_READY',
         updatedAt: now,
       },
     });
@@ -1168,32 +1248,36 @@ export class CbtService {
     await this.prisma.pc.updateMany({
       where: { hostname: pcHostname },
       data: {
-        cbtStatus: 'UNLOCKED',
+        cbtStatus: 'EXAM_READY',
         lastSeen: now,
       },
     });
 
-    // 5. Emit Socket.IO verification event
+    // 6. Emit Socket.IO verification event
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
       socketServer.emit('cbt:dob-verified', {
         pcHostname,
         studentId: student.id,
         studentName: student.name || student.username,
-        cbtStatus: 'UNLOCKED',
+        regNumber: student.regNumber || student.rollNumber || student.username,
+        cbtStatus: 'EXAM_READY',
         unlockedAt: now.toISOString(),
       });
       socketServer.emit('cbt:pc-list-updated', { pcHostname });
     }
 
+    this.logger.log(`[CBT] Candidate verified: ${student.username} on ${pcHostname}. Exam unlocked.`);
+
     return {
       success: true,
       verified: true,
-      message: 'Date of Birth verified. Examination unlocked.',
+      message: 'Candidate identity verified. Examination paper unlocked.',
       student: {
         id: student.id,
         name: student.name || student.username,
         regNumber: student.regNumber || student.rollNumber || student.username,
+        dateOfBirth: student.dateOfBirth,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'General',
       },
@@ -1273,12 +1357,26 @@ export class CbtService {
       });
     }
 
+    const isAssigned = !!reg?.assignedStudentId;
+    const isVerified = reg?.isDobVerified || false;
+    let computedStatus = 'REGISTERED';
+    if (isVerified) {
+      computedStatus = 'EXAM_READY';
+    } else if (isAssigned) {
+      computedStatus = 'ALLOCATED';
+    } else if (reg || pc) {
+      computedStatus = 'WAITING_FOR_ALLOCATION';
+    }
+
     return {
       registered: !!reg,
       cbtCode: reg?.cbtCode || null,
       pcHostname: upperHost,
-      cbtStatus: pc?.cbtStatus || reg?.status || (reg ? 'REGISTERED' : 'IDLE'),
-      isDobVerified: reg?.isDobVerified || false,
+      pcRegistrationId: reg?.id || null,
+      cbtStatus: pc?.cbtStatus || computedStatus,
+      assigned: isAssigned,
+      isDobVerified: isVerified,
+      candidateVerificationRequired: isAssigned && !isVerified,
       institution: branding ? {
         name: branding.name,
         code: branding.code,
@@ -1305,6 +1403,7 @@ export class CbtService {
         id: student.id,
         name: student.name || student.username,
         regNumber: student.regNumber || student.rollNumber || student.username,
+        dateOfBirth: student.dateOfBirth,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'Computer Science & Engineering',
       } : null,

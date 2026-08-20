@@ -6,6 +6,8 @@ export declare class CreateStudentDto {
     mobile?: string;
     email?: string;
     classId?: string;
+    dateOfBirth?: string;
+    semester?: string;
     departmentId?: string;
     institutionId?: string;
 }
@@ -34,6 +36,8 @@ export declare class UpdateUserDto {
     mobile?: string;
     email?: string;
     classId?: string;
+    dateOfBirth?: string;
+    semester?: string;
     departmentId?: string;
     institutionId?: string;
     isActive?: boolean;

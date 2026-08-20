@@ -34,6 +34,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -63,6 +65,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -98,6 +102,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -127,6 +133,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }[]>;
@@ -156,6 +164,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -208,6 +218,8 @@ export declare class AdminUsersController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }>;
@@ -241,6 +253,8 @@ export declare class TeacherStudentsController {
         isSuperAdmin: boolean;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
     }[]>;

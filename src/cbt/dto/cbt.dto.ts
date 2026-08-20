@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -362,14 +363,16 @@ export class ValidateUniqueCodeDto {
 
 export class AllocateStudentDto {
   @IsString()
+  @IsNotEmpty()
   pcHostname: string;
 
   @IsString()
+  @IsNotEmpty()
   studentId: string;
 
   @IsOptional()
   @IsString()
-  invigilatorId?: string;
+  pcRegistrationId?: string;
 
   @IsOptional()
   @IsString()
@@ -378,11 +381,28 @@ export class AllocateStudentDto {
   @IsOptional()
   @IsString()
   sessionId?: string;
+
+  @IsOptional()
+  @IsString()
+  cbtCode?: string;
+
+  @IsOptional()
+  @IsString()
+  invigilatorId?: string;
+
+  @IsOptional()
+  @IsString()
+  invigilatorName?: string;
 }
 
 export class DeallocateStudentDto {
   @IsString()
+  @IsNotEmpty()
   pcHostname: string;
+
+  @IsOptional()
+  @IsString()
+  pcRegistrationId?: string;
 
   @IsOptional()
   @IsString()
@@ -395,18 +415,20 @@ export class DeallocateStudentDto {
 
 export class VerifyDobDto {
   @IsString()
+  @IsNotEmpty()
   pcHostname: string;
 
-  @IsOptional()
   @IsString()
-  studentId?: string;
+  @IsNotEmpty()
+  dateOfBirth: string; // e.g. YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
 
   @IsOptional()
   @IsString()
   regNumber?: string;
 
+  @IsOptional()
   @IsString()
-  dateOfBirth: string; // e.g. YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+  studentId?: string;
 
   @IsOptional()
   @IsString()
