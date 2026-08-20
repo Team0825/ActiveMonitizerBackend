@@ -44,8 +44,10 @@ let RolesGuard = class RolesGuard extends (0, passport_1.AuthGuard)('jwt') {
             return false;
         }
         const userRole = String(user.role).toUpperCase();
-        return requiredRoles.some((role) => role.toUpperCase() ===
-            userRole);
+        const isSuperAdmin = user.isSuperAdmin === true ||
+            userRole === 'SUPER_ADMIN';
+        return requiredRoles.some((role) => role.toUpperCase() === userRole ||
+            (isSuperAdmin && (role.toUpperCase() === 'ADMIN' || role.toUpperCase() === 'SUPER_ADMIN')));
     }
 };
 exports.RolesGuard = RolesGuard;

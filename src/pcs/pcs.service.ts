@@ -1275,5 +1275,81 @@ async getHealth() {
     return violations;
   }
 
+  async recordHeartbeat(dto: {
+    hostname: string;
+    labName?: string;
+    sessionId?: string;
+    studentId?: string;
+    agentVersion?: string;
+    healthStatus?: string;
+  }) {
+    const hostname = (dto.hostname || '').trim().toUpperCase();
+    if (!hostname) return { success: false, message: 'Hostname required' };
+
+    const now = new Date();
+
+    const pc = await this.prisma.pc.upsert({
+      where: { hostname },
+      create: {
+        hostname,
+        displayName: hostname,
+        labName: dto.labName || 'Main Lab',
+        status: 'ONLINE',
+        healthStatus: dto.healthStatus || 'HEALTHY',
+        internetStatus: 'ONLINE',
+        agentVersion: dto.agentVersion || '1.0.0',
+        currentSessionId: dto.sessionId || null,
+        currentStudentId: dto.studentId || null,
+        lastSeen: now,
+      },
+      update: {
+        status: 'ONLINE',
+        healthStatus: dto.healthStatus || undefined,
+        agentVersion: dto.agentVersion || undefined,
+        currentSessionId: dto.sessionId || undefined,
+        currentStudentId: dto.studentId || undefined,
+        lastSeen: now,
+      },
+    });
+
+    return {
+      success: true,
+      hostname,
+      status: 'ONLINE',
+      lastSeen: now.toISOString(),
+      cbtStatus: pc.cbtStatus || 'IDLE',
+    };
+  }
+
+  async getAllPcs() {
+    const pcs = await this.prisma.pc.findMany({
+      orderBy: { hostname: 'asc' },
+    });
+
+    const now = Date.now();
+
+    return pcs.map((pc) => {
+      const lastSeenMs = pc.lastSeen ? new Date(pc.lastSeen).getTime() : 0;
+      const isLive = pc.status === 'ONLINE' && now - lastSeenMs < 45 * 1000;
+
+      return {
+        id: pc.id,
+        hostname: pc.hostname,
+        displayName: pc.displayName || pc.hostname,
+        labName: pc.labName || 'Main Lab',
+        status: isLive ? 'CONNECTED' : 'OFFLINE',
+        connectionStatus: isLive ? 'CONNECTED' : 'OFFLINE',
+        healthStatus: isLive ? pc.healthStatus || 'HEALTHY' : 'OFFLINE',
+        internetStatus: isLive ? pc.internetStatus || 'ONLINE' : 'OFFLINE',
+        cbtStatus: pc.cbtStatus || 'IDLE',
+        assignedStudentId: pc.assignedStudentId || null,
+        assignedInvigilatorId: pc.assignedInvigilatorId || null,
+        currentSessionId: pc.currentSessionId || null,
+        lastSeen: pc.lastSeen || null,
+        registeredAt: pc.registeredAt,
+      };
+    });
+  }
 }
+
 

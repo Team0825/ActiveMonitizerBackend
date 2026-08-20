@@ -359,3 +359,80 @@ export class ValidateUniqueCodeDto {
   @IsString()
   authorityToken?: string;
 }
+
+export class AllocateStudentDto {
+  @IsString()
+  pcHostname: string;
+
+  @IsString()
+  studentId: string;
+
+  @IsOptional()
+  @IsString()
+  invigilatorId?: string;
+
+  @IsOptional()
+  @IsString()
+  examId?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+}
+
+export class DeallocateStudentDto {
+  @IsString()
+  pcHostname: string;
+
+  @IsOptional()
+  @IsString()
+  examId?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+}
+
+export class VerifyDobDto {
+  @IsString()
+  pcHostname: string;
+
+  @IsOptional()
+  @IsString()
+  studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  regNumber?: string;
+
+  @IsString()
+  dateOfBirth: string; // e.g. YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+
+  @IsOptional()
+  @IsString()
+  examId?: string;
+}
+
+export class TerminatePcDto {
+  @IsString()
+  pcHostname: string;
+
+  @IsString()
+  username: string;
+
+  @IsString()
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class EmergencyTerminationToggleDto {
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsString()
+  adminPassword: string;
+}
+

@@ -17,18 +17,23 @@ import { RateLimiterService } from '../common/rate-limiter.service';
 import { PcsService } from '../pcs/pcs.service';
 import {
   AuthorityLoginDto,
+  AllocateStudentDto,
   CorrectResultDto,
   CreateExamDto,
   CreateQuestionDto,
   CreateQuestionPaperDto,
+  DeallocateStudentDto,
+  EmergencyTerminationToggleDto,
   GenerateResultsDto,
   RegisterPcDto,
   SaveAnswerDto,
   StartExamDto,
   SubmitExamDto,
+  TerminatePcDto,
   UpdateExamDto,
   UpdateQuestionPaperDto,
   ValidateUniqueCodeDto,
+  VerifyDobDto,
 } from './dto/cbt.dto';
 
 @Injectable()
@@ -694,18 +699,30 @@ export class CbtService {
     };
   }
 
-  async listRegisteredPcs(cbtCodeOrExamId: string) {
-    let exam = await this.prisma.exam.findFirst({
-      where: {
-        OR: [{ id: cbtCodeOrExamId }, { cbtCode: cbtCodeOrExamId.toUpperCase() }],
-      },
-    });
+  async listRegisteredPcs(cbtCodeOrExamId?: string) {
+    let exam = null;
+    if (cbtCodeOrExamId) {
+      exam = await this.prisma.exam.findFirst({
+        where: {
+          OR: [{ id: cbtCodeOrExamId }, { cbtCode: cbtCodeOrExamId.toUpperCase() }],
+        },
+      });
+    }
 
-    const cbtCode = exam?.cbtCode || cbtCodeOrExamId.toUpperCase();
+    const cbtCode = exam?.cbtCode || (cbtCodeOrExamId ? cbtCodeOrExamId.toUpperCase() : undefined);
+
+    const whereClause: any = {};
+    if (cbtCode || exam?.id) {
+      whereClause.OR = [
+        ...(cbtCode ? [{ cbtCode }] : []),
+        ...(exam?.id ? [{ examId: exam.id }] : []),
+      ];
+    }
 
     const registrations = await this.prisma.cbtPcRegistration.findMany({
-      where: {
-        OR: [{ cbtCode }, { examId: exam?.id || undefined }],
+      where: whereClause,
+      include: {
+        exam: { select: { id: true, title: true, subject: true, durationMinutes: true } },
       },
       orderBy: { registeredAt: 'asc' },
     });
@@ -722,15 +739,57 @@ export class CbtService {
         status: true,
         healthStatus: true,
         internetStatus: true,
+        currentSessionId: true,
+        assignedStudentId: true,
+        assignedInvigilatorId: true,
+        cbtStatus: true,
         lastSeen: true,
       },
     });
 
     const pcMap = new Map(pcs.map((p) => [p.hostname.toUpperCase(), p]));
 
+    // Fetch assigned students for detailed display
+    const studentIds = registrations
+      .map((r) => r.assignedStudentId)
+      .filter((id): id is string => !!id);
+
+    const students = await this.prisma.user.findMany({
+      where: { id: { in: studentIds } },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        regNumber: true,
+        rollNumber: true,
+        semester: true,
+        departmentName: true,
+        department: { select: { name: true } },
+      },
+    });
+
+    const studentMap = new Map(students.map((s) => [s.id, s]));
+
+    const now = Date.now();
+
     const result = registrations.map((reg, index) => {
       const pcInfo = pcMap.get(reg.pcHostname.toUpperCase());
-      const isLiveOnline = pcInfo?.status === 'ONLINE';
+      const lastSeenMs = pcInfo?.lastSeen ? new Date(pcInfo.lastSeen).getTime() : 0;
+      // PC is considered LIVE CONNECTED if lastSeen is within 45 seconds AND status is ONLINE
+      const isLiveConnected = pcInfo?.status === 'ONLINE' && now - lastSeenMs < 45 * 1000;
+      const student = reg.assignedStudentId ? studentMap.get(reg.assignedStudentId) : null;
+
+      let cbtStatus = reg.status;
+      if (!isLiveConnected && reg.status !== 'TERMINATED') {
+        cbtStatus = 'OFFLINE';
+      } else if (reg.isDobVerified) {
+        cbtStatus = 'EXAM RUNNING';
+      } else if (reg.assignedStudentId) {
+        cbtStatus = 'EXAM READY';
+      } else if (reg.status === 'REGISTERED') {
+        cbtStatus = 'REGISTERED';
+      }
+
       return {
         serialNumber: index + 1,
         id: reg.id,
@@ -738,12 +797,46 @@ export class CbtService {
         pcHostname: reg.pcHostname,
         displayName: pcInfo?.displayName || reg.pcHostname,
         labName: pcInfo?.labName || 'Main Lab',
-        status: reg.status,
-        isOnline: isLiveOnline,
-        healthStatus: pcInfo?.healthStatus || 'HEALTHY',
-        internetStatus: pcInfo?.internetStatus || 'ONLINE',
+        regStatus: reg.status,
+        status: isLiveConnected ? 'CONNECTED' : 'OFFLINE',
+        connectionStatus: isLiveConnected ? 'CONNECTED' : 'OFFLINE',
+        isOnline: isLiveConnected,
+        healthStatus: pcInfo?.healthStatus || (isLiveConnected ? 'HEALTHY' : 'OFFLINE'),
+        internetStatus: pcInfo?.internetStatus || (isLiveConnected ? 'ONLINE' : 'OFFLINE'),
         lastSeen: pcInfo?.lastSeen || null,
         registeredAt: reg.registeredAt,
+        cbtStatus,
+        isDobVerified: reg.isDobVerified,
+        assignedStudent: student
+          ? {
+              id: student.id,
+              name: student.name || student.username,
+              regNumber: student.regNumber || student.rollNumber || student.username,
+              semester: student.semester || 'Semester 1',
+              department: student.department?.name || student.departmentName || 'General',
+            }
+          : reg.assignedStudentName
+          ? {
+              id: reg.assignedStudentId,
+              name: reg.assignedStudentName,
+              regNumber: reg.assignedStudentRegNo,
+              semester: 'Semester 1',
+              department: 'General',
+            }
+          : null,
+        assignedInvigilator: reg.assignedInvigilatorName
+          ? {
+              id: reg.assignedInvigilatorId,
+              name: reg.assignedInvigilatorName,
+            }
+          : null,
+        exam: reg.exam
+          ? {
+              id: reg.exam.id,
+              title: reg.exam.title,
+              subject: reg.exam.subject,
+            }
+          : null,
       };
     });
 
@@ -751,13 +844,570 @@ export class CbtService {
     const offlineCount = result.length - onlineCount;
 
     return {
-      cbtCode,
+      cbtCode: cbtCode || '',
       examId: exam?.id || null,
       isPcConfigLocked: exam?.isPcConfigLocked || false,
       totalRegistered: result.length,
       onlineCount,
       offlineCount,
       pcs: result,
+    };
+  }
+
+  /*
+   * ==========================================================
+   * 2.1 STUDENT TO PC ALLOCATION & INVIGILATOR ASSIGNMENT
+   * ==========================================================
+   */
+
+  async allocateStudent(adminId: string, dto: AllocateStudentDto) {
+    const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
+    const studentId = (dto.studentId || '').trim();
+
+    if (!pcHostname || !studentId) {
+      throw new BadRequestException('Both pcHostname and studentId are required for allocation.');
+    }
+
+    // 1. Find Student
+    const student = await this.prisma.user.findFirst({
+      where: {
+        id: studentId,
+        role: 'STUDENT',
+      },
+      include: { department: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException(`Student record not found for ID: ${studentId}`);
+    }
+
+    // 2. Find Invigilator (if provided)
+    let invigilator = null;
+    if (dto.invigilatorId) {
+      invigilator = await this.prisma.user.findFirst({
+        where: {
+          id: dto.invigilatorId,
+          role: { in: ['TEACHER', 'ADMIN', 'SUPER_ADMIN'] },
+        },
+      });
+    }
+
+    // 3. Find CbtPcRegistration or Pc
+    let reg = await this.prisma.cbtPcRegistration.findFirst({
+      where: { pcHostname },
+    });
+
+    const now = new Date();
+
+    if (reg) {
+      reg = await this.prisma.cbtPcRegistration.update({
+        where: { id: reg.id },
+        data: {
+          assignedStudentId: student.id,
+          assignedStudentName: student.name || student.username,
+          assignedStudentRegNo: student.regNumber || student.rollNumber || student.username,
+          assignedInvigilatorId: invigilator?.id || null,
+          assignedInvigilatorName: invigilator?.name || invigilator?.username || null,
+          examId: dto.examId || reg.examId,
+          sessionId: dto.sessionId || reg.sessionId,
+          isDobVerified: false,
+          status: 'ALLOCATED',
+          updatedAt: now,
+        },
+      });
+    }
+
+    // 4. Update PC record
+    await this.prisma.pc.updateMany({
+      where: { hostname: pcHostname },
+      data: {
+        assignedStudentId: student.id,
+        assignedInvigilatorId: invigilator?.id || null,
+        currentStudentId: student.id,
+        cbtStatus: 'ALLOCATED',
+        lastSeen: now,
+      },
+    });
+
+    // 5. Emit Socket.IO event to Agent, CBT Web Portal & Admin Dashboards
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:student-allocated', {
+        pcHostname,
+        studentId: student.id,
+        studentName: student.name || student.username,
+        regNumber: student.regNumber || student.rollNumber || student.username,
+        semester: student.semester || 'Semester 1',
+        department: student.department?.name || student.departmentName || 'General',
+        invigilatorName: invigilator?.name || invigilator?.username || 'Assigned Invigilator',
+        cbtStatus: 'ALLOCATED',
+        allocatedAt: now.toISOString(),
+      });
+
+      socketServer.emit('cbt:pc-list-updated', {
+        pcHostname,
+        cbtCode: reg?.cbtCode,
+      });
+    }
+
+    return {
+      success: true,
+      message: `Student ${student.name || student.username} successfully assigned to PC ${pcHostname}.`,
+      allocation: {
+        pcHostname,
+        studentId: student.id,
+        studentName: student.name || student.username,
+        regNumber: student.regNumber || student.rollNumber || student.username,
+        semester: student.semester || 'Semester 1',
+        department: student.department?.name || student.departmentName || 'General',
+        invigilatorId: invigilator?.id || null,
+        invigilatorName: invigilator?.name || invigilator?.username || null,
+        cbtStatus: 'ALLOCATED',
+        isDobVerified: false,
+      },
+    };
+  }
+
+  async deallocateStudent(adminId: string, dto: DeallocateStudentDto) {
+    const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
+
+    if (!pcHostname) {
+      throw new BadRequestException('pcHostname is required.');
+    }
+
+    const now = new Date();
+
+    await this.prisma.cbtPcRegistration.updateMany({
+      where: { pcHostname },
+      data: {
+        assignedStudentId: null,
+        assignedStudentName: null,
+        assignedStudentRegNo: null,
+        assignedInvigilatorId: null,
+        assignedInvigilatorName: null,
+        isDobVerified: false,
+        status: 'REGISTERED',
+        updatedAt: now,
+      },
+    });
+
+    await this.prisma.pc.updateMany({
+      where: { hostname: pcHostname },
+      data: {
+        assignedStudentId: null,
+        assignedInvigilatorId: null,
+        currentStudentId: null,
+        cbtStatus: 'REGISTERED',
+        lastSeen: now,
+      },
+    });
+
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:student-deallocated', {
+        pcHostname,
+        cbtStatus: 'REGISTERED',
+      });
+      socketServer.emit('cbt:pc-list-updated', { pcHostname });
+    }
+
+    return {
+      success: true,
+      message: `Student deallocated from PC ${pcHostname}. PC returned to Idle state.`,
+      pcHostname,
+      cbtStatus: 'REGISTERED',
+    };
+  }
+
+  /*
+   * ==========================================================
+   * 2.2 DATE OF BIRTH (DOB) VERIFICATION & EXAM UNLOCK
+   * ==========================================================
+   */
+
+  async verifyDob(dto: VerifyDobDto) {
+    const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
+    const rawDob = (dto.dateOfBirth || '').trim();
+
+    if (!pcHostname || !rawDob) {
+      throw new BadRequestException('pcHostname and dateOfBirth are required.');
+    }
+
+    // 1. Find registration for this PC
+    const reg = await this.prisma.cbtPcRegistration.findFirst({
+      where: { pcHostname },
+      include: {
+        exam: {
+          include: {
+            questionPaper: {
+              include: {
+                questions: {
+                  orderBy: { orderIndex: 'asc' },
+                  select: {
+                    id: true,
+                    questionText: true,
+                    questionType: true,
+                    section: true,
+                    orderIndex: true,
+                    options: true,
+                    marks: true,
+                    negativeMarks: true,
+                    imageUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!reg || !reg.assignedStudentId) {
+      throw new BadRequestException('No student is currently assigned to this PC.');
+    }
+
+    // 2. Find Student Record
+    const student = await this.prisma.user.findUnique({
+      where: { id: reg.assignedStudentId },
+      include: { department: true, institution: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Assigned student record not found.');
+    }
+
+    // 3. Verify Date of Birth
+    const normalizeDob = (val: string) => {
+      if (!val) return '';
+      return val.replace(/[\/\-\.\s]/g, '').trim();
+    };
+
+    const inputNormalized = normalizeDob(rawDob);
+    const storedNormalized = normalizeDob(student.dateOfBirth || '');
+
+    let isMatch = false;
+    if (storedNormalized) {
+      if (inputNormalized === storedNormalized) {
+        isMatch = true;
+      } else if (rawDob === student.dateOfBirth) {
+        isMatch = true;
+      } else {
+        try {
+          const inputDate = new Date(rawDob).toISOString().slice(0, 10);
+          const storedDate = new Date(student.dateOfBirth || '').toISOString().slice(0, 10);
+          if (inputDate === storedDate) isMatch = true;
+        } catch {}
+      }
+    } else {
+      isMatch = true;
+      await this.prisma.user.update({
+        where: { id: student.id },
+        data: { dateOfBirth: rawDob },
+      });
+    }
+
+    if (!isMatch) {
+      return {
+        success: false,
+        verified: false,
+        message: 'Invalid Date of Birth entered. Please verify with your invigilator.',
+      };
+    }
+
+    // 4. Mark Registration & PC as UNLOCKED
+    const now = new Date();
+    await this.prisma.cbtPcRegistration.update({
+      where: { id: reg.id },
+      data: {
+        isDobVerified: true,
+        status: 'UNLOCKED',
+        updatedAt: now,
+      },
+    });
+
+    await this.prisma.pc.updateMany({
+      where: { hostname: pcHostname },
+      data: {
+        cbtStatus: 'UNLOCKED',
+        lastSeen: now,
+      },
+    });
+
+    // 5. Emit Socket.IO verification event
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:dob-verified', {
+        pcHostname,
+        studentId: student.id,
+        studentName: student.name || student.username,
+        cbtStatus: 'UNLOCKED',
+        unlockedAt: now.toISOString(),
+      });
+      socketServer.emit('cbt:pc-list-updated', { pcHostname });
+    }
+
+    return {
+      success: true,
+      verified: true,
+      message: 'Date of Birth verified. Examination unlocked.',
+      student: {
+        id: student.id,
+        name: student.name || student.username,
+        regNumber: student.regNumber || student.rollNumber || student.username,
+        semester: student.semester || 'Semester 1',
+        department: student.department?.name || student.departmentName || 'General',
+      },
+      exam: reg.exam
+        ? {
+            id: reg.exam.id,
+            title: reg.exam.title,
+            subject: reg.exam.subject,
+            instructions: reg.exam.instructions,
+            durationMinutes: reg.exam.durationMinutes,
+            totalMarks: reg.exam.totalMarks,
+            passingMarks: reg.exam.passingMarks,
+            totalQuestions: reg.exam.questionPaper?.questions?.length || 0,
+            questions: reg.exam.questionPaper?.questions || [],
+          }
+        : null,
+    };
+  }
+
+  /*
+   * ==========================================================
+   * 2.3 PC ALLOCATION & STATUS LOOKUP (AGENT & CBT CLIENTS)
+   * ==========================================================
+   */
+
+  async getPcAllocation(pcHostname: string) {
+    const upperHost = (pcHostname || '').trim().toUpperCase();
+    if (!upperHost) {
+      return { registered: false, cbtStatus: 'IDLE', pcHostname: '' };
+    }
+
+    const reg = await this.prisma.cbtPcRegistration.findFirst({
+      where: { pcHostname: upperHost },
+      include: {
+        exam: {
+          include: {
+            session: true,
+            questionPaper: {
+              select: {
+                id: true,
+                title: true,
+                subject: true,
+                totalMarks: true,
+                passingMarks: true,
+                _count: { select: { questions: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const pc = await this.prisma.pc.findUnique({
+      where: { hostname: upperHost },
+    });
+
+    const branding = await this.prisma.institution.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!reg && !pc) {
+      return {
+        registered: false,
+        cbtStatus: 'IDLE',
+        pcHostname: upperHost,
+        institution: branding ? { name: branding.name, board: branding.board, location: branding.location, logoUrl: branding.logoUrl } : null,
+      };
+    }
+
+    let student = null;
+    if (reg?.assignedStudentId || pc?.assignedStudentId) {
+      const studentId = reg?.assignedStudentId || pc?.assignedStudentId || '';
+      student = await this.prisma.user.findUnique({
+        where: { id: studentId },
+        include: { department: true },
+      });
+    }
+
+    return {
+      registered: !!reg,
+      cbtCode: reg?.cbtCode || null,
+      pcHostname: upperHost,
+      cbtStatus: pc?.cbtStatus || reg?.status || (reg ? 'REGISTERED' : 'IDLE'),
+      isDobVerified: reg?.isDobVerified || false,
+      institution: branding ? {
+        name: branding.name,
+        code: branding.code,
+        board: branding.board,
+        location: branding.location,
+        logoUrl: branding.logoUrl,
+      } : null,
+      session: reg?.exam?.session ? {
+        id: reg.exam.session.id,
+        sessionCode: reg.exam.session.sessionCode,
+        classTitle: reg.exam.session.classTitle,
+        durationMinutes: reg.exam.session.durationMinutes,
+      } : null,
+      exam: reg?.exam ? {
+        id: reg.exam.id,
+        title: reg.exam.title,
+        subject: reg.exam.subject,
+        durationMinutes: reg.exam.durationMinutes,
+        totalMarks: reg.exam.totalMarks,
+        passingMarks: reg.exam.passingMarks,
+        questionCount: reg.exam.questionPaper?._count?.questions || 0,
+      } : null,
+      student: student ? {
+        id: student.id,
+        name: student.name || student.username,
+        regNumber: student.regNumber || student.rollNumber || student.username,
+        semester: student.semester || 'Semester 1',
+        department: student.department?.name || student.departmentName || 'Computer Science & Engineering',
+      } : null,
+      invigilatorName: reg?.assignedInvigilatorName || 'Assigned Invigilator',
+      lastSeen: pc?.lastSeen || null,
+      isOnline: pc?.status === 'ONLINE',
+    };
+  }
+
+  /*
+   * ==========================================================
+   * 2.4 EMERGENCY PC TERMINATION (CTRL + ALT + C WITH AUTH)
+   * ==========================================================
+   */
+
+  async terminatePc(dto: TerminatePcDto) {
+    const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
+    const username = (dto.username || '').trim();
+    const password = (dto.password || '');
+
+    if (!pcHostname || !username || !password) {
+      throw new BadRequestException('pcHostname, username, and password are required.');
+    }
+
+    // 1. Authenticate administrator
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ username }, { email: username }],
+        role: { in: ['ADMIN', 'SUPER_ADMIN', 'TEACHER'] },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid administrator credentials.');
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Invalid administrator credentials.');
+    }
+
+    // 2. Deregister CBT registration & terminate PC state
+    const now = new Date();
+    await this.prisma.cbtPcRegistration.updateMany({
+      where: { pcHostname },
+      data: {
+        status: 'TERMINATED',
+        assignedStudentId: null,
+        assignedStudentName: null,
+        assignedStudentRegNo: null,
+        isDobVerified: false,
+        updatedAt: now,
+      },
+    });
+
+    await this.prisma.pc.updateMany({
+      where: { hostname: pcHostname },
+      data: {
+        status: 'OFFLINE',
+        cbtStatus: 'TERMINATED',
+        assignedStudentId: null,
+        assignedInvigilatorId: null,
+        currentStudentId: null,
+        currentSessionId: null,
+        lastSeen: now,
+      },
+    });
+
+    // 3. Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'PC_TERMINATED_EMERGENCY',
+        targetPc: pcHostname,
+        metadata: JSON.stringify({
+          terminatedBy: user.username,
+          role: user.role,
+          reason: dto.reason || 'Emergency shortcut / administrator termination',
+          timestamp: now.toISOString(),
+        }),
+      },
+    });
+
+    // 4. Emit Socket.IO termination event
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:pc-terminated', {
+        pcHostname,
+        terminatedBy: user.username,
+        reason: dto.reason || 'Emergency shortcut / administrator termination',
+        cbtStatus: 'TERMINATED',
+      });
+      socketServer.emit('cbt:pc-list-updated', { pcHostname });
+    }
+
+    return {
+      success: true,
+      message: `PC ${pcHostname} has been securely terminated and returned to idle state.`,
+      pcHostname,
+      cbtStatus: 'TERMINATED',
+    };
+  }
+
+  async toggleEmergencyTermination(adminId: string, dto: EmergencyTerminationToggleDto) {
+    const admin = await this.prisma.user.findUnique({ where: { id: adminId } });
+    if (!admin) throw new NotFoundException('Admin user not found.');
+
+    const isValidPassword = await bcrypt.compare(dto.adminPassword, admin.passwordHash);
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Admin password verification failed.');
+    }
+
+    await this.prisma.authoritySetting.upsert({
+      where: { key: 'EMERGENCY_TERMINATION_ENABLED' },
+      create: {
+        key: 'EMERGENCY_TERMINATION_ENABLED',
+        passwordHash: dto.enabled ? 'true' : 'false',
+        updatedById: adminId,
+      },
+      update: {
+        passwordHash: dto.enabled ? 'true' : 'false',
+        updatedById: adminId,
+      },
+    });
+
+    const socketServer = this.realtimeService.getServer();
+    if (socketServer) {
+      socketServer.emit('cbt:emergency-termination-updated', { enabled: dto.enabled });
+    }
+
+    return {
+      success: true,
+      enabled: dto.enabled,
+      message: `Emergency termination shortcut (Ctrl + Alt + C) ${dto.enabled ? 'ENABLED' : 'DISABLED'}.`,
+    };
+  }
+
+  async getEmergencyTerminationStatus() {
+    const setting = await this.prisma.authoritySetting.findUnique({
+      where: { key: 'EMERGENCY_TERMINATION_ENABLED' },
+    });
+    return {
+      enabled: setting?.passwordHash === 'true',
     };
   }
 

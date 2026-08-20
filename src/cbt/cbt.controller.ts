@@ -14,22 +14,27 @@ import { JwtAuthGuard, JwtPayload } from '../auth/jwt.strategy';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CbtService } from './cbt.service';
 import {
+  AllocateStudentDto,
   AuthorityLoginDto,
   AuthorityPasswordDto,
   CorrectResultDto,
   CreateExamDto,
   CreateQuestionDto,
   CreateQuestionPaperDto,
+  DeallocateStudentDto,
+  EmergencyTerminationToggleDto,
   GenerateResultsDto,
   LockPcConfigDto,
   RegisterPcDto,
   SaveAnswerDto,
   StartExamDto,
   SubmitExamDto,
+  TerminatePcDto,
   UpdateExamDto,
   UpdateQuestionPaperDto,
   ValidateUniqueCodeDto,
   VerifyAuthorityPasswordDto,
+  VerifyDobDto,
 } from './dto/cbt.dto';
 
 type AuthenticatedRequest = Request & { user: JwtPayload };
@@ -140,6 +145,56 @@ export class CbtController {
   ) {
     const target = examId || cbtCode || '';
     return this.cbtService.deleteRegisteredPc(target, pcHostname);
+  }
+
+  @UseGuards(RolesGuard)
+  @Post('allocate-student')
+  @Roles('ADMIN', 'TEACHER')
+  allocateStudent(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: AllocateStudentDto,
+  ) {
+    return this.cbtService.allocateStudent(req.user.sub, dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Post('deallocate-student')
+  @Roles('ADMIN', 'TEACHER')
+  deallocateStudent(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: DeallocateStudentDto,
+  ) {
+    return this.cbtService.deallocateStudent(req.user.sub, dto);
+  }
+
+  @Post('verify-dob')
+  verifyDob(@Body() dto: VerifyDobDto) {
+    return this.cbtService.verifyDob(dto);
+  }
+
+  @Get('pc-allocation')
+  getPcAllocation(@Query('pcHostname') pcHostname: string) {
+    return this.cbtService.getPcAllocation(pcHostname);
+  }
+
+  @Post('terminate-pc')
+  terminatePc(@Body() dto: TerminatePcDto) {
+    return this.cbtService.terminatePc(dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Post('emergency-termination/toggle')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  toggleEmergencyTermination(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: EmergencyTerminationToggleDto,
+  ) {
+    return this.cbtService.toggleEmergencyTermination(req.user.sub, dto);
+  }
+
+  @Get('emergency-termination/status')
+  getEmergencyTerminationStatus() {
+    return this.cbtService.getEmergencyTerminationStatus();
   }
 
   @UseGuards(RolesGuard)

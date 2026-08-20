@@ -2,6 +2,44 @@ import { PcsService } from './pcs.service';
 export declare class PcsController {
     private readonly pcsService;
     constructor(pcsService: PcsService);
+    getAllPcs(): Promise<{
+        id: string;
+        hostname: string;
+        displayName: string;
+        labName: string;
+        status: string;
+        connectionStatus: string;
+        healthStatus: string;
+        internetStatus: string;
+        cbtStatus: string;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        currentSessionId: string | null;
+        lastSeen: Date | null;
+        registeredAt: Date;
+    }[]>;
+    recordHeartbeat(dto: {
+        hostname: string;
+        labName?: string;
+        sessionId?: string;
+        studentId?: string;
+        agentVersion?: string;
+        healthStatus?: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        hostname?: undefined;
+        status?: undefined;
+        lastSeen?: undefined;
+        cbtStatus?: undefined;
+    } | {
+        success: boolean;
+        hostname: string;
+        status: string;
+        lastSeen: string;
+        cbtStatus: string;
+        message?: undefined;
+    }>;
     getHealth(): Promise<{
         hostname: string;
         displayName: string | null;

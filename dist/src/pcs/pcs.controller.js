@@ -19,6 +19,12 @@ let PcsController = class PcsController {
     constructor(pcsService) {
         this.pcsService = pcsService;
     }
+    async getAllPcs() {
+        return this.pcsService.getAllPcs();
+    }
+    async recordHeartbeat(dto) {
+        return this.pcsService.recordHeartbeat(dto);
+    }
     async getHealth() {
         return this.pcsService.getHealth();
     }
@@ -27,6 +33,19 @@ let PcsController = class PcsController {
     }
 };
 exports.PcsController = PcsController;
+__decorate([
+    (0, common_1.Get)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], PcsController.prototype, "getAllPcs", null);
+__decorate([
+    (0, common_1.Post)('heartbeat'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], PcsController.prototype, "recordHeartbeat", null);
 __decorate([
     (0, common_1.Get)('health'),
     __metadata("design:type", Function),

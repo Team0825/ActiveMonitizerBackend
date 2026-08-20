@@ -34,6 +34,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -69,6 +73,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -105,6 +113,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -140,6 +152,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -175,6 +191,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -234,6 +254,10 @@ export declare class PcsService {
         updateStatus: string;
         currentSessionId: string | null;
         currentStudentId: string | null;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        cbtStatus: string;
+        emergencyTerminationEnabled: boolean;
         lastSeen: Date | null;
         lastHealthCheck: Date | null;
         lastSyncAt: Date | null;
@@ -324,4 +348,42 @@ export declare class PcsService {
         severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
     }>;
     getViolations(sessionId?: string): Promise<any[]>;
+    recordHeartbeat(dto: {
+        hostname: string;
+        labName?: string;
+        sessionId?: string;
+        studentId?: string;
+        agentVersion?: string;
+        healthStatus?: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        hostname?: undefined;
+        status?: undefined;
+        lastSeen?: undefined;
+        cbtStatus?: undefined;
+    } | {
+        success: boolean;
+        hostname: string;
+        status: string;
+        lastSeen: string;
+        cbtStatus: string;
+        message?: undefined;
+    }>;
+    getAllPcs(): Promise<{
+        id: string;
+        hostname: string;
+        displayName: string;
+        labName: string;
+        status: string;
+        connectionStatus: string;
+        healthStatus: string;
+        internetStatus: string;
+        cbtStatus: string;
+        assignedStudentId: string | null;
+        assignedInvigilatorId: string | null;
+        currentSessionId: string | null;
+        lastSeen: Date | null;
+        registeredAt: Date;
+    }[]>;
 }

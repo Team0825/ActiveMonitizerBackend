@@ -22,7 +22,8 @@ import {
 export type UserRole =
   | 'STUDENT'
   | 'TEACHER'
-  | 'ADMIN';
+  | 'ADMIN'
+  | 'SUPER_ADMIN';
 
 /*
  * ============================================================
@@ -153,14 +154,18 @@ export class RolesGuard
         user.role,
       ).toUpperCase();
 
+    const isSuperAdmin =
+      user.isSuperAdmin === true ||
+      userRole === 'SUPER_ADMIN';
+
     /*
      * Compare against allowed roles.
      */
 
     return requiredRoles.some(
       (role) =>
-        role.toUpperCase() ===
-        userRole,
+        role.toUpperCase() === userRole ||
+        (isSuperAdmin && (role.toUpperCase() === 'ADMIN' || role.toUpperCase() === 'SUPER_ADMIN')),
     );
   }
 }

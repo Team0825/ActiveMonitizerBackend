@@ -165,6 +165,9 @@ export declare class AdminUsersService {
         rollNumber: string | null;
         mobile: string | null;
         classId: string | null;
+        dateOfBirth: string | null;
+        semester: string | null;
+        departmentName: string | null;
         departmentId: string | null;
         lastLoginAt: Date | null;
         lastActiveAt: Date | null;

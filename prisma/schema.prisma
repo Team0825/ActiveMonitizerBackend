@@ -20,6 +20,9 @@ model User {
   mobile     String?
   email      String? @unique
   classId    String?
+  dateOfBirth String?
+  semester   String?
+  departmentName String?
 
   institutionId String?
   institution   Institution? @relation(fields: [institutionId], references: [id])
@@ -184,6 +187,10 @@ model Pc {
 
   currentSessionId String?
   currentStudentId String?
+  assignedStudentId String?
+  assignedInvigilatorId String?
+  cbtStatus        String   @default("IDLE") // IDLE, REGISTERED, ALLOCATED, UNLOCKED, IN_PROGRESS, COMPLETED, TERMINATED
+  emergencyTerminationEnabled Boolean @default(false)
 
   lastSeen        DateTime?
   lastHealthCheck DateTime?
@@ -760,6 +767,12 @@ model CbtPcRegistration {
   cbtCode      String
   pcHostname   String
   pcId         String?
+  assignedStudentId String?
+  assignedStudentName String?
+  assignedStudentRegNo String?
+  assignedInvigilatorId String?
+  assignedInvigilatorName String?
+  isDobVerified Boolean      @default(false)
   status       String       @default("REGISTERED")
   registeredAt DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
