@@ -7,12 +7,12 @@ import { AskChatbotDto } from './dto/ask-chatbot.dto';
 
 type AuthenticatedRequest = Request & { user?: JwtPayload };
 
-@Controller('chatbot')
+@Controller(['chatbot', 'ai'])
 export class ChatbotController {
   constructor(private readonly chatbotService: ChatbotService) {}
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @Post('ask')
+  @Post(['ask', 'chat'])
   @HttpCode(200)
   ask(@Req() req: AuthenticatedRequest, @Body() dto: AskChatbotDto) {
     const studentId = req.user?.sub || dto.sessionId || 'AGENT_STUDENT';

@@ -77,15 +77,21 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         if (dto.expectedRole) {
-            if (user.role !== dto.expectedRole) {
+            const normalizedExpected = dto.expectedRole.toUpperCase();
+            const userRole = (user.role || '').toUpperCase();
+            const isMatch = userRole === normalizedExpected ||
+                (normalizedExpected === 'ADMIN' && (userRole === 'SUPER_ADMIN' || user.isSuperAdmin)) ||
+                (normalizedExpected === 'TEACHER' && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN'));
+            if (!isMatch) {
                 await this.audit('LOGIN_FAILED_ROLE_MISMATCH', user.id, dto);
-                throw new common_1.ForbiddenException(`This account is not a ${dto.expectedRole.toLowerCase()} account`);
+                throw new common_1.ForbiddenException(`This account does not have ${dto.expectedRole.toLowerCase()} privileges.`);
             }
         }
         else {
             const isStaffOrAuthority = user.role === 'ADMIN' ||
                 user.role === 'TEACHER' ||
-                user.role === 'SUPER_ADMIN';
+                user.role === 'SUPER_ADMIN' ||
+                user.isSuperAdmin;
             if (!isStaffOrAuthority) {
                 await this.audit('LOGIN_FAILED_ROLE_MISMATCH', user.id, dto);
                 throw new common_1.ForbiddenException('Your account is authenticated but does not have administrator or teacher access.');

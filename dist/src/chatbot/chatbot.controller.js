@@ -33,7 +33,7 @@ let ChatbotController = class ChatbotController {
 exports.ChatbotController = ChatbotController;
 __decorate([
     (0, throttler_1.Throttle)({ default: { limit: 30, ttl: 60_000 } }),
-    (0, common_1.Post)('ask'),
+    (0, common_1.Post)(['ask', 'chat']),
     (0, common_1.HttpCode)(200),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
@@ -52,7 +52,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ChatbotController.prototype, "guide", null);
 exports.ChatbotController = ChatbotController = __decorate([
-    (0, common_1.Controller)('chatbot'),
+    (0, common_1.Controller)(['chatbot', 'ai']),
     __metadata("design:paramtypes", [chatbot_service_1.ChatbotService])
 ], ChatbotController);
 //# sourceMappingURL=chatbot.controller.js.map
