@@ -288,6 +288,34 @@ export class SubmitExamDto {
   isAutoSubmit?: boolean = false;
 }
 
+export class StudentSaveAnswerDto extends SaveAnswerDto {
+  @IsOptional()
+  @IsString()
+  studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  pcHostname?: string;
+
+  @IsOptional()
+  @IsString()
+  cbtCode?: string;
+}
+
+export class StudentSubmitExamDto extends SubmitExamDto {
+  @IsOptional()
+  @IsString()
+  studentId?: string;
+
+  @IsOptional()
+  @IsString()
+  pcHostname?: string;
+
+  @IsOptional()
+  @IsString()
+  cbtCode?: string;
+}
+
 export class RegisterPcDto {
   @IsString()
   cbtCode: string;

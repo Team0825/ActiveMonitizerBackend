@@ -29,6 +29,8 @@ import {
   RegisterPcDto,
   SaveAnswerDto,
   StartExamDto,
+  StudentSaveAnswerDto,
+  StudentSubmitExamDto,
   SubmitExamDto,
   TerminatePcDto,
   UpdateExamDto,
@@ -1096,8 +1098,16 @@ export class CbtService {
       );
     }
 
-    // Pick the first available workstation or randomize
-    const targetPc = availablePcs[0];
+    // Prioritize online workstations if available, then pick randomly among available workstations
+    const onlinePcs: typeof availablePcs = [];
+    for (const p of availablePcs) {
+      const pcRecord = await this.prisma.pc.findUnique({ where: { hostname: p.pcHostname } });
+      if (pcRecord?.status === 'ONLINE') {
+        onlinePcs.push(p);
+      }
+    }
+    const pool = onlinePcs.length > 0 ? onlinePcs : availablePcs;
+    const targetPc = pool[Math.floor(Math.random() * pool.length)];
 
     return this.allocateStudent(adminId, {
       pcHostname: targetPc.pcHostname,
@@ -2899,6 +2909,96 @@ export class CbtService {
       examTitle: exam.title,
       subject: exam.subject,
     };
+  }
+
+  async resolveStudentId(params: {
+    studentId?: string;
+    pcHostname?: string;
+    cbtCode?: string;
+    examId?: string;
+  }): Promise<string> {
+    if (params.studentId && params.studentId.trim()) {
+      return params.studentId.trim();
+    }
+    const host = (params.pcHostname || '').trim().toUpperCase();
+    const code = (params.cbtCode || '').trim().toUpperCase();
+
+    if (host && code) {
+      const reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { pcHostname: host, cbtCode: code },
+        orderBy: { registeredAt: 'desc' },
+      });
+      if (reg?.assignedStudentId) {
+        return reg.assignedStudentId;
+      }
+    }
+
+    if (host) {
+      const reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { pcHostname: host },
+        orderBy: { registeredAt: 'desc' },
+      });
+      if (reg?.assignedStudentId) {
+        return reg.assignedStudentId;
+      }
+      const pc = await this.prisma.pc.findUnique({ where: { hostname: host } });
+      if (pc?.assignedStudentId) {
+        return pc.assignedStudentId;
+      }
+    }
+
+    if (code) {
+      const reg = await this.prisma.cbtPcRegistration.findFirst({
+        where: { cbtCode: code },
+        orderBy: { registeredAt: 'desc' },
+      });
+      if (reg?.assignedStudentId) {
+        return reg.assignedStudentId;
+      }
+    }
+
+    // Fallback: If there is an attempt for the given exam on this PC hostname
+    if (host && params.examId) {
+      const attempt = await this.prisma.examAttempt.findFirst({
+        where: { examId: params.examId, pcHostname: host },
+        orderBy: { startedAt: 'desc' },
+      });
+      if (attempt?.studentId) {
+        return attempt.studentId;
+      }
+    }
+
+    throw new NotFoundException('Could not identify allocated student candidate for this workstation session.');
+  }
+
+  async saveStudentCbtAnswer(dto: StudentSaveAnswerDto) {
+    const studentId = await this.resolveStudentId({
+      studentId: dto.studentId,
+      pcHostname: dto.pcHostname,
+      cbtCode: dto.cbtCode,
+      examId: dto.examId,
+    });
+    return this.saveAnswer(studentId, dto);
+  }
+
+  async submitStudentCbtExam(dto: StudentSubmitExamDto) {
+    const studentId = await this.resolveStudentId({
+      studentId: dto.studentId,
+      pcHostname: dto.pcHostname,
+      cbtCode: dto.cbtCode,
+      examId: dto.examId,
+    });
+    return this.submitExam(studentId, dto);
+  }
+
+  async getStudentCbtResult(examId: string, params: { studentId?: string; pcHostname?: string; cbtCode?: string }) {
+    const studentId = await this.resolveStudentId({
+      studentId: params.studentId,
+      pcHostname: params.pcHostname,
+      cbtCode: params.cbtCode,
+      examId,
+    });
+    return this.getStudentResult(studentId, examId);
   }
 
   /*
