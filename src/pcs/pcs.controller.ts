@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { PcsService } from './pcs.service';
 
 @Controller('pcs')
@@ -30,6 +30,11 @@ export class PcsController {
   @Get('health')
   async getHealth() {
     return this.pcsService.getHealth();
+  }
+
+  @Delete('health/:hostname')
+  async deleteHealthRecord(@Param('hostname') hostname: string) {
+    return this.pcsService.deleteHealthRecord(hostname);
   }
 
   @Get('violations')

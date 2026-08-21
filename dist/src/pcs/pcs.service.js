@@ -724,6 +724,41 @@ let PcsService = class PcsService {
             };
         });
     }
+    async deleteHealthRecord(hostname) {
+        const upperHost = (hostname || '').trim().toUpperCase();
+        const pc = await this.prisma.pc.findFirst({
+            where: {
+                hostname: {
+                    equals: upperHost,
+                    mode: 'insensitive',
+                },
+            },
+        });
+        if (!pc) {
+            throw new common_1.NotFoundException(`Workstation (${hostname}) not found.`);
+        }
+        const now = Date.now();
+        const lastSeenMs = pc.lastSeen ? new Date(pc.lastSeen).getTime() : 0;
+        const isLive = pc.status === 'ONLINE' && now - lastSeenMs <= 15 * 1000;
+        if (isLive) {
+            throw new common_1.BadRequestException(`Workstation "${pc.hostname}" is currently ONLINE. Active/Online health records cannot be deleted.`);
+        }
+        await this.prisma.pcHealthReport.deleteMany({
+            where: { pcId: pc.id },
+        });
+        await this.prisma.pc.update({
+            where: { id: pc.id },
+            data: {
+                healthStatus: 'UNKNOWN',
+                lastHealthCheck: null,
+            },
+        });
+        return {
+            success: true,
+            message: `Offline health record for "${pc.hostname}" successfully deleted.`,
+            hostname: pc.hostname,
+        };
+    }
 };
 exports.PcsService = PcsService;
 exports.PcsService = PcsService = __decorate([

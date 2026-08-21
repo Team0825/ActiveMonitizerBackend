@@ -28,6 +28,9 @@ let PcsController = class PcsController {
     async getHealth() {
         return this.pcsService.getHealth();
     }
+    async deleteHealthRecord(hostname) {
+        return this.pcsService.deleteHealthRecord(hostname);
+    }
     async getViolations(sessionId) {
         return this.pcsService.getViolations(sessionId);
     }
@@ -52,6 +55,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], PcsController.prototype, "getHealth", null);
+__decorate([
+    (0, common_1.Delete)('health/:hostname'),
+    __param(0, (0, common_1.Param)('hostname')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], PcsController.prototype, "deleteHealthRecord", null);
 __decorate([
     (0, common_1.Get)('violations'),
     __param(0, (0, common_1.Query)('sessionId')),

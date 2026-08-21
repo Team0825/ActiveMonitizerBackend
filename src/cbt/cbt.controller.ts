@@ -440,6 +440,13 @@ export class CbtController {
     return this.cbtService.getStudentResult(req.user.sub, examId);
   }
 
+  @Post('student/conclude')
+  concludeExam(
+    @Body() dto: { pcHostname?: string; studentId?: string; cbtCode?: string },
+  ) {
+    return this.cbtService.concludeStudentCbtExam(dto);
+  }
+
   /*
    * ==========================================================
    * 6. RESULTS, MANUAL CORRECTIONS & GENERATION (ADMIN / TEACHER)

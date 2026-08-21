@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PcCommandAction } from './dto/pcs.dto';
@@ -1349,6 +1349,52 @@ async getHealth() {
         registeredAt: pc.registeredAt,
       };
     });
+  }
+
+  async deleteHealthRecord(hostname: string) {
+    const upperHost = (hostname || '').trim().toUpperCase();
+    const pc = await this.prisma.pc.findFirst({
+      where: {
+        hostname: {
+          equals: upperHost,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (!pc) {
+      throw new NotFoundException(`Workstation (${hostname}) not found.`);
+    }
+
+    const now = Date.now();
+    const lastSeenMs = pc.lastSeen ? new Date(pc.lastSeen).getTime() : 0;
+    const isLive = pc.status === 'ONLINE' && now - lastSeenMs <= 15 * 1000;
+
+    if (isLive) {
+      throw new BadRequestException(
+        `Workstation "${pc.hostname}" is currently ONLINE. Active/Online health records cannot be deleted.`,
+      );
+    }
+
+    // Delete associated PcHealthReport records
+    await this.prisma.pcHealthReport.deleteMany({
+      where: { pcId: pc.id },
+    });
+
+    // Reset healthStatus on PC without deleting the PC registration or CBT authorization
+    await this.prisma.pc.update({
+      where: { id: pc.id },
+      data: {
+        healthStatus: 'UNKNOWN',
+        lastHealthCheck: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Offline health record for "${pc.hostname}" successfully deleted.`,
+      hostname: pc.hostname,
+    };
   }
 }
 

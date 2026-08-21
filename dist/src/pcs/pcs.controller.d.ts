@@ -101,5 +101,10 @@ export declare class PcsController {
         registeredAt: Date;
         updatedAt: Date;
     }[]>;
+    deleteHealthRecord(hostname: string): Promise<{
+        success: boolean;
+        message: string;
+        hostname: string;
+    }>;
     getViolations(sessionId?: string): Promise<any[]>;
 }

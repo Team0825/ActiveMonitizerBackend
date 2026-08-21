@@ -386,4 +386,9 @@ export declare class PcsService {
         lastSeen: Date | null;
         registeredAt: Date;
     }[]>;
+    deleteHealthRecord(hostname: string): Promise<{
+        success: boolean;
+        message: string;
+        hostname: string;
+    }>;
 }

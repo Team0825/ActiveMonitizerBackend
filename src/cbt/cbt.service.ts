@@ -84,6 +84,26 @@ export class CbtService {
     throw new BadRequestException('Failed to generate a unique CBT code. Please try again.');
   }
 
+  private deterministicShuffle<T>(items: T[], seedStr: string): T[] {
+    if (!items || items.length <= 1) return items ? [...items] : [];
+    const copy = [...items];
+    let seed = 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    }
+    const random = () => {
+      seed = (seed + 0x6d2b79f5) >>> 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
   async generateOneTimeCbtCode(adminId: string): Promise<{ cbtCode: string; code: string; expiresAt: Date }> {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     const genChunk = (len: number) => {
@@ -924,7 +944,24 @@ export class CbtService {
       throw new NotFoundException(`Student record not found for ID: ${studentId}`);
     }
 
-    // 2. Prevent candidate from being actively assigned to another PC
+    // 2. Prevent duplicate examination attempts for this candidate
+    if (dto.examId) {
+      const priorAttempt = await this.prisma.examAttempt.findFirst({
+        where: {
+          examId: dto.examId,
+          studentId: student.id,
+          status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
+        },
+      });
+
+      if (priorAttempt) {
+        throw new ConflictException(
+          'Examination already attempted. You cannot take this examination again during this scheduled session.',
+        );
+      }
+    }
+
+    // 3. Prevent candidate from being actively assigned to another PC
     const existingAssignment = await this.prisma.cbtPcRegistration.findFirst({
       where: {
         assignedStudentId: student.id,
@@ -1066,6 +1103,23 @@ export class CbtService {
 
     if (!student) {
       throw new NotFoundException(`Student record not found for ID: ${studentId}`);
+    }
+
+    // Prevent duplicate examination attempts for this candidate
+    if (dto.examId) {
+      const priorAttempt = await this.prisma.examAttempt.findFirst({
+        where: {
+          examId: dto.examId,
+          studentId: student.id,
+          status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
+        },
+      });
+
+      if (priorAttempt) {
+        throw new ConflictException(
+          'Examination already attempted. You cannot take this examination again during this scheduled session.',
+        );
+      }
     }
 
     // Check if student already assigned to an active workstation
@@ -1245,6 +1299,25 @@ export class CbtService {
 
     if (!student) {
       throw new NotFoundException('Assigned student record not found.');
+    }
+
+    // Check if candidate has already completed this examination
+    if (reg.examId) {
+      const priorAttempt = await this.prisma.examAttempt.findFirst({
+        where: {
+          examId: reg.examId,
+          studentId: student.id,
+          status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
+        },
+      });
+
+      if (priorAttempt) {
+        return {
+          success: false,
+          verified: false,
+          message: 'Examination already attempted. You cannot take this examination again during this scheduled session.',
+        };
+      }
     }
 
     // 3. Candidate ID / Reg Number Match (if candidate supplied regNumber)
@@ -1643,48 +1716,151 @@ export class CbtService {
       });
     }
 
-    // 7. Check Examination Scheduling
+    // 7. Check Examination Scheduling & Synchronized Launch
     const startsAt = exam?.startsAt ? new Date(exam.startsAt) : null;
     const endsAt = exam?.endsAt ? new Date(exam.endsAt) : null;
 
-    if (startsAt && now < startsAt && exam?.status === 'SCHEDULED') {
-      return {
-        status: 'EXAM_NOT_STARTED',
-        assignmentStatus: 'EXAM_NOT_STARTED',
-        registered: true,
-        cbtStatus: 'ALLOCATED',
-        assigned: true,
-        isDobVerified: reg?.isDobVerified || false,
-        pcHostname: upperHost || reg?.pcHostname,
-        cbtCode: reg?.cbtCode || cleanCbtCode,
-        pc: {
-          hostname: upperHost || reg?.pcHostname,
-          labName: pc?.labName || 'Main Lab',
-          ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
-          isOnline: pc?.status === 'ONLINE',
+    // Check prior attempt for candidate on this exam
+    if (exam && student) {
+      const priorAttempt = await this.prisma.examAttempt.findFirst({
+        where: {
+          examId: exam.id,
+          studentId: student.id,
+          status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
         },
-        student: {
-          id: student.id,
-          name: student.name || student.username,
-          username: student.username,
-          regNumber: student.regNumber || student.rollNumber || student.username,
-          registrationNumber: student.regNumber || student.rollNumber || student.username,
-          semester: student.semester || 'Semester 1',
-          department: student.department?.name || student.departmentName || 'Computer Science',
-        },
-        exam: {
-          id: exam.id,
-          title: exam.title,
-          subject: exam.subject,
-          durationMinutes: exam.durationMinutes,
-          startsAt: startsAt.toISOString(),
-          startTime: startsAt.toISOString(),
-        },
-        serverTime: now.toISOString(),
-        serverCurrentTime: now.getTime(),
-        remainingSeconds: 0,
-        message: `Examination scheduled to commence at ${startsAt.toLocaleString()}.`,
-      };
+      });
+
+      if (priorAttempt) {
+        return {
+          status: 'EXAM_ALREADY_ATTEMPTED',
+          assignmentStatus: 'EXAM_ALREADY_ATTEMPTED',
+          cbtStatus: 'COMPLETED',
+          registered: true,
+          assigned: true,
+          isDobVerified: reg?.isDobVerified || false,
+          candidateVerificationRequired: false,
+          pcHostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+          cbtCode: reg?.cbtCode || cleanCbtCode,
+          pc: {
+            hostname: upperHost || reg?.pcHostname || 'LOCAL_PC',
+            labName: pc?.labName || 'Main Lab',
+            ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+            isOnline: pc?.status === 'ONLINE',
+          },
+          student: {
+            id: student.id,
+            name: student.name || student.username,
+            username: student.username,
+            regNumber: student.regNumber || student.rollNumber || student.username,
+            registrationNumber: student.regNumber || student.rollNumber || student.username,
+            semester: student.semester || 'Semester 1',
+            department: student.department?.name || student.departmentName || 'General',
+          },
+          exam: {
+            id: exam.id,
+            title: exam.title,
+            subject: exam.subject,
+            durationMinutes: exam.durationMinutes,
+            startsAt: startsAt?.toISOString() || null,
+            startTime: startsAt?.toISOString() || null,
+          },
+          serverTime: now.toISOString(),
+          serverCurrentTime: now.getTime(),
+          remainingSeconds: 0,
+          message: 'Examination already attempted. You cannot take this examination again during this scheduled session.',
+        };
+      }
+    }
+
+    if (startsAt && now < startsAt && (exam?.status === 'SCHEDULED' || exam?.status === 'DRAFT' || exam?.status === 'ACTIVE')) {
+      const secondsToStart = Math.floor((startsAt.getTime() - now.getTime()) / 1000);
+      if (secondsToStart > 300) {
+        // More than 5 minutes before scheduled start time
+        return {
+          status: 'WAITING_FOR_SCHEDULED_TIME',
+          assignmentStatus: 'WAITING_FOR_SCHEDULED_TIME',
+          registered: true,
+          cbtStatus: 'ALLOCATED',
+          assigned: true,
+          isDobVerified: reg?.isDobVerified || false,
+          candidateVerificationRequired: !reg?.isDobVerified,
+          pcHostname: upperHost || reg?.pcHostname,
+          cbtCode: reg?.cbtCode || cleanCbtCode,
+          scheduledStartTime: startsAt.toISOString(),
+          secondsToStart,
+          countdownSeconds: secondsToStart,
+          pc: {
+            hostname: upperHost || reg?.pcHostname,
+            labName: pc?.labName || 'Main Lab',
+            ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+            isOnline: pc?.status === 'ONLINE',
+          },
+          student: {
+            id: student.id,
+            name: student.name || student.username,
+            username: student.username,
+            regNumber: student.regNumber || student.rollNumber || student.username,
+            registrationNumber: student.regNumber || student.rollNumber || student.username,
+            semester: student.semester || 'Semester 1',
+            department: student.department?.name || student.departmentName || 'Computer Science',
+          },
+          exam: {
+            id: exam.id,
+            title: exam.title,
+            subject: exam.subject,
+            durationMinutes: exam.durationMinutes,
+            startsAt: startsAt.toISOString(),
+            startTime: startsAt.toISOString(),
+          },
+          serverTime: now.toISOString(),
+          serverCurrentTime: now.getTime(),
+          remainingSeconds: 0,
+          message: `PC authorized. Examination has not started yet. Please wait. (Scheduled for ${startsAt.toLocaleTimeString()})`,
+        };
+      } else if (secondsToStart > 0) {
+        // 5-Minute Countdown Window before exam start
+        return {
+          status: 'COUNTDOWN',
+          assignmentStatus: 'COUNTDOWN',
+          registered: true,
+          cbtStatus: 'EXAM_READY',
+          assigned: true,
+          isDobVerified: reg?.isDobVerified || false,
+          candidateVerificationRequired: !reg?.isDobVerified,
+          pcHostname: upperHost || reg?.pcHostname,
+          cbtCode: reg?.cbtCode || cleanCbtCode,
+          scheduledStartTime: startsAt.toISOString(),
+          countdownSeconds: secondsToStart,
+          secondsToStart,
+          pc: {
+            hostname: upperHost || reg?.pcHostname,
+            labName: pc?.labName || 'Main Lab',
+            ipAddress: (pc as any)?.ipAddress || (pc as any)?.ip || null,
+            isOnline: pc?.status === 'ONLINE',
+          },
+          student: {
+            id: student.id,
+            name: student.name || student.username,
+            username: student.username,
+            regNumber: student.regNumber || student.rollNumber || student.username,
+            registrationNumber: student.regNumber || student.rollNumber || student.username,
+            semester: student.semester || 'Semester 1',
+            department: student.department?.name || student.departmentName || 'Computer Science',
+          },
+          exam: {
+            id: exam.id,
+            title: exam.title,
+            subject: exam.subject,
+            durationMinutes: exam.durationMinutes,
+            startsAt: startsAt.toISOString(),
+            startTime: startsAt.toISOString(),
+          },
+          serverTime: now.toISOString(),
+          serverCurrentTime: now.getTime(),
+          remainingSeconds: 0,
+          message: 'EXAMINATION READY. Please wait for the examination to begin.',
+        };
+      }
     }
 
     if (endsAt && now > endsAt) {
@@ -1771,7 +1947,7 @@ export class CbtService {
     const examStartTime = attemptStartTime.toISOString();
     const examEndTime = new Date(attemptStartTime.getTime() + durationSeconds * 1000).toISOString();
 
-    // 10. Format and Sanitize Questions (MCQ with 4 Options)
+    // 10. Format and Sanitize Questions (Deterministic Candidate Shuffling)
     const savedAnswersMap = new Map();
     if (attempt?.answers) {
       for (const ans of attempt.answers) {
@@ -1780,7 +1956,10 @@ export class CbtService {
     }
 
     const rawQuestions = exam?.questionPaper?.questions || [];
-    const questions = rawQuestions.map((q: any, idx: number) => {
+    const seed = `${student.id}-${exam?.id || 'exam'}`;
+    const shuffledPool = this.deterministicShuffle(rawQuestions, seed);
+
+    const questions = shuffledPool.map((q: any, idx: number) => {
       let rawOpts = q.options;
       if (typeof rawOpts === 'string') {
         try {
@@ -2875,6 +3054,37 @@ export class CbtService {
       },
     });
 
+    // When attempt is finalized, reset the physical workstation to AVAILABLE for the next candidate
+    if (attempt.pcHostname) {
+      await this.prisma.cbtPcRegistration.updateMany({
+        where: { pcHostname: attempt.pcHostname },
+        data: {
+          status: 'AVAILABLE',
+          isDobVerified: false,
+          assignedStudentId: null,
+          assignedStudentName: null,
+          assignedStudentRegNo: null,
+        },
+      });
+
+      await this.prisma.pc.updateMany({
+        where: { hostname: attempt.pcHostname },
+        data: {
+          cbtStatus: 'AVAILABLE',
+          assignedStudentId: null,
+          currentStudentId: null,
+        },
+      });
+
+      const socketServer = this.realtimeService.getServer();
+      if (socketServer) {
+        socketServer.emit('cbt:pc-list-updated', {
+          pcHostname: attempt.pcHostname,
+          status: 'AVAILABLE',
+        });
+      }
+    }
+
     return result;
   }
 
@@ -3001,6 +3211,46 @@ export class CbtService {
     return this.getStudentResult(studentId, examId);
   }
 
+  async concludeStudentCbtExam(params: { pcHostname?: string; studentId?: string; cbtCode?: string }) {
+    const pcHostname = (params.pcHostname || '').trim().toUpperCase();
+    if (pcHostname) {
+      await this.prisma.cbtPcRegistration.updateMany({
+        where: { pcHostname },
+        data: {
+          status: 'AVAILABLE',
+          isDobVerified: false,
+          assignedStudentId: null,
+          assignedStudentName: null,
+          assignedStudentRegNo: null,
+        },
+      });
+
+      await this.prisma.pc.updateMany({
+        where: { hostname: pcHostname },
+        data: {
+          cbtStatus: 'AVAILABLE',
+          assignedStudentId: null,
+          currentStudentId: null,
+        },
+      });
+
+      const socketServer = this.realtimeService.getServer();
+      if (socketServer) {
+        socketServer.emit('cbt:pc-list-updated', {
+          pcHostname,
+          status: 'AVAILABLE',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Workstation released and reset to AVAILABLE for the next candidate.',
+      pcHostname,
+      cbtStatus: 'AVAILABLE',
+    };
+  }
+
   /*
    * ==========================================================
    * 7. MANUAL RESULT CORRECTION & AUDIT LOGGING (ADMIN)
@@ -3105,9 +3355,10 @@ export class CbtService {
 
     if (!exam) throw new NotFoundException(`Exam not found.`);
 
+    const effectiveScope = (dto.scope || dto.type || 'ALL').toUpperCase();
     let whereClause: any = { examId };
 
-    if (dto.scope === 'SELECTED' && dto.studentIds?.length) {
+    if (effectiveScope === 'SELECTED' && dto.studentIds?.length) {
       whereClause.studentId = { in: dto.studentIds };
     }
 

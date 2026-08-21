@@ -352,8 +352,13 @@ export class CorrectResultDto {
 }
 
 export class GenerateResultsDto {
+  @IsOptional()
   @IsString()
-  scope: 'ALL' | 'SELECTED';
+  scope?: string = 'ALL';
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsArray()

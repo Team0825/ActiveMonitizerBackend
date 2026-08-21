@@ -88,4 +88,18 @@ export class StudentCbtController {
   verifyDob(@Body() dto: VerifyDobDto) {
     return this.cbtService.verifyDob(dto);
   }
+
+  /**
+   * ============================================================
+   * POST /student/conclude & POST /student/cbt/conclude
+   *
+   * Releases workstation and resets PC state to AVAILABLE for next candidate.
+   * ============================================================
+   */
+  @Post(['conclude', 'cbt/conclude'])
+  concludeExam(
+    @Body() dto: { pcHostname?: string; studentId?: string; cbtCode?: string },
+  ) {
+    return this.cbtService.concludeStudentCbtExam(dto);
+  }
 }
