@@ -924,11 +924,22 @@ export class CbtService {
    */
 
   async allocateStudent(adminId: string, dto: AllocateStudentDto) {
-    const pcHostname = (dto.pcHostname || '').trim().toUpperCase();
+    let pcHostname = (dto.pcHostname || '').trim().toUpperCase();
     const studentId = (dto.studentId || '').trim();
+    const targetExamId = (dto.examId || dto.examinationId || '').trim() || undefined;
+
+    // If pcHostname not provided, attempt lookup by pcId
+    if (!pcHostname && dto.pcId) {
+      const pcById = await this.prisma.pc.findUnique({
+        where: { id: dto.pcId.trim() },
+      });
+      if (pcById) {
+        pcHostname = pcById.hostname.trim().toUpperCase();
+      }
+    }
 
     if (!pcHostname || !studentId) {
-      throw new BadRequestException('Both pcHostname and studentId are required for allocation.');
+      throw new BadRequestException('Both PC Workstation and Candidate Student are required for allocation.');
     }
 
     // 1. Find Student Record
@@ -944,11 +955,33 @@ export class CbtService {
       throw new NotFoundException(`Student record not found for ID: ${studentId}`);
     }
 
-    // 2. Prevent duplicate examination attempts for this candidate
-    if (dto.examId) {
+    // 2. Validate Examination & Question Paper if provided
+    let exam = null;
+    if (targetExamId) {
+      exam = await this.prisma.exam.findUnique({
+        where: { id: targetExamId },
+        include: { questionPaper: true, session: true },
+      });
+      if (!exam) {
+        throw new NotFoundException(`Examination not found for ID: ${targetExamId}`);
+      }
+    }
+
+    let questionPaper = exam?.questionPaper || null;
+    if (dto.questionPaperId && (!questionPaper || questionPaper.id !== dto.questionPaperId)) {
+      const qp = await this.prisma.questionPaper.findUnique({
+        where: { id: dto.questionPaperId.trim() },
+      });
+      if (qp) {
+        questionPaper = qp;
+      }
+    }
+
+    // 3. Prevent duplicate examination attempts for this candidate
+    if (targetExamId) {
       const priorAttempt = await this.prisma.examAttempt.findFirst({
         where: {
-          examId: dto.examId,
+          examId: targetExamId,
           studentId: student.id,
           status: { in: ['SUBMITTED', 'AUTO_SUBMITTED', 'EVALUATED'] },
         },
@@ -956,12 +989,12 @@ export class CbtService {
 
       if (priorAttempt) {
         throw new ConflictException(
-          'Examination already attempted. You cannot take this examination again during this scheduled session.',
+          `Candidate "${student.name || student.username}" has already submitted this examination. Re-taking is not permitted for completed exams.`,
         );
       }
     }
 
-    // 3. Prevent candidate from being actively assigned to another PC
+    // 4. Prevent candidate from being actively assigned to another PC
     const existingAssignment = await this.prisma.cbtPcRegistration.findFirst({
       where: {
         assignedStudentId: student.id,
@@ -972,11 +1005,11 @@ export class CbtService {
 
     if (existingAssignment) {
       throw new ConflictException(
-        `Candidate "${student.name || student.username}" (${student.regNumber || student.username}) is already assigned to workstation ${existingAssignment.pcHostname}. Please release that workstation first.`,
+        `Candidate "${student.name || student.username}" (${student.regNumber || student.username}) is already assigned to workstation ${existingAssignment.pcHostname}. Please deallocate that workstation first.`,
       );
     }
 
-    // 3. Find Invigilator (if provided)
+    // 5. Find Invigilator (if provided)
     let invigilator = null;
     if (dto.invigilatorId) {
       invigilator = await this.prisma.user.findFirst({
@@ -987,7 +1020,7 @@ export class CbtService {
       });
     }
 
-    // 4. Find CbtPcRegistration
+    // 6. Find or Create CbtPcRegistration for this Workstation
     let reg = null;
     if (dto.pcRegistrationId) {
       reg = await this.prisma.cbtPcRegistration.findUnique({
@@ -998,7 +1031,7 @@ export class CbtService {
       reg = await this.prisma.cbtPcRegistration.findFirst({
         where: {
           pcHostname,
-          ...(dto.cbtCode ? { cbtCode: dto.cbtCode } : {}),
+          ...(dto.cbtCode ? { cbtCode: dto.cbtCode } : exam?.cbtCode ? { cbtCode: exam.cbtCode } : {}),
         },
         orderBy: { registeredAt: 'desc' },
       });
@@ -1012,6 +1045,7 @@ export class CbtService {
 
     const now = new Date();
     const invigilatorName = invigilator?.name || invigilator?.username || dto.invigilatorName || null;
+    const effectiveCbtCode = dto.cbtCode || exam?.cbtCode || reg?.cbtCode || 'CBT-GEN';
 
     if (reg) {
       reg = await this.prisma.cbtPcRegistration.update({
@@ -1022,16 +1056,34 @@ export class CbtService {
           assignedStudentRegNo: student.regNumber || student.rollNumber || student.username,
           assignedInvigilatorId: invigilator?.id || null,
           assignedInvigilatorName: invigilatorName,
-          examId: dto.examId || reg.examId,
-          sessionId: dto.sessionId || reg.sessionId,
+          examId: targetExamId || reg.examId,
+          sessionId: dto.sessionId || exam?.sessionId || reg.sessionId,
+          cbtCode: effectiveCbtCode,
           isDobVerified: false,
           status: 'ALLOCATED',
           updatedAt: now,
         },
       });
+    } else {
+      // Auto-register PC for CBT if not yet in registration table
+      reg = await this.prisma.cbtPcRegistration.create({
+        data: {
+          pcHostname,
+          cbtCode: effectiveCbtCode,
+          assignedStudentId: student.id,
+          assignedStudentName: student.name || student.username,
+          assignedStudentRegNo: student.regNumber || student.rollNumber || student.username,
+          assignedInvigilatorId: invigilator?.id || null,
+          assignedInvigilatorName: invigilatorName,
+          examId: targetExamId || null,
+          sessionId: dto.sessionId || exam?.sessionId || null,
+          isDobVerified: false,
+          status: 'ALLOCATED',
+        },
+      });
     }
 
-    // 5. Update PC record
+    // 7. Update PC record
     await this.prisma.pc.updateMany({
       where: { hostname: pcHostname },
       data: {
@@ -1043,7 +1095,7 @@ export class CbtService {
       },
     });
 
-    // 6. Emit Socket.IO event to Agent, CBT Web Portal & Admin Dashboards
+    // 8. Emit Socket.IO event to Agent, CBT Web Portal & Admin Dashboards
     const socketServer = this.realtimeService.getServer();
     if (socketServer) {
       socketServer.emit('cbt:student-allocated', {
@@ -1055,6 +1107,7 @@ export class CbtService {
         regNumber: student.regNumber || student.rollNumber || student.username,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'General',
+        questionPaperTitle: questionPaper?.title || exam?.title || 'General CBT Assessment',
         invigilatorName: invigilatorName || 'Assigned Invigilator',
         cbtStatus: 'ALLOCATED',
         allocatedAt: now.toISOString(),
@@ -1082,9 +1135,12 @@ export class CbtService {
         regNumber: student.regNumber || student.rollNumber || student.username,
         semester: student.semester || 'Semester 1',
         department: student.department?.name || student.departmentName || 'General',
+        questionPaperTitle: questionPaper?.title || exam?.title || 'General CBT Assessment',
+        examTitle: exam?.title || 'CBT Examination',
         invigilatorId: invigilator?.id || null,
         invigilatorName: invigilatorName,
         cbtStatus: 'ALLOCATED',
+        status: 'ASSIGNED',
         isDobVerified: false,
       },
     };
@@ -3386,23 +3442,30 @@ export class CbtService {
     // Generate continuous serial numbers (1, 2, 3...)
     const candidates = rawResults.map((r, index) => ({
       serialNumber: index + 1,
+      id: r.id,
       studentId: r.student.id,
       studentName: r.student.name || r.student.username,
-      registrationNumber: r.student.regNumber || r.student.username,
+      regNumber: r.student.regNumber || r.student.rollNumber || r.student.username,
+      registrationNumber: r.student.regNumber || r.student.rollNumber || r.student.username,
       rollNumber: r.student.rollNumber || '-',
       totalMarks: r.totalMarks,
       attended: r.attemptedCount > 0,
       attemptedCount: r.attemptedCount,
+      totalQuestions: r.totalQuestions,
       obtainedMarks: r.obtainedMarks,
+      correctCount: r.correctCount,
       totalCorrect: r.correctCount,
+      wrongCount: r.wrongCount,
       totalWrong: r.wrongCount,
+      unansweredCount: r.unansweredCount,
       totalUnanswered: r.unansweredCount,
       percentage: r.percentage,
-      grade: r.grade,
+      grade: r.grade || (r.isPassed ? 'A' : 'F'),
       isPassed: r.isPassed,
-      status: r.status,
+      status: r.isPassed ? 'PASSED' : 'FAILED',
       hasManualCorrection: r.corrections.length > 0,
       evaluatedAt: r.evaluatedAt,
+      submittedAt: r.evaluatedAt ? r.evaluatedAt.toLocaleString() : '—',
       publishedAt: r.publishedAt,
     }));
 
@@ -3426,14 +3489,25 @@ export class CbtService {
         resultPublished: exam.resultPublished,
         sessionTitle: exam.session?.classTitle || 'General Session',
       },
-      scope: dto.scope,
+      examTitle: exam.title,
+      subject: exam.subject,
+      scope: effectiveScope,
       generatedAt: new Date(),
       totalCandidates,
+      count: totalCandidates,
       passedCount,
       failedCount,
       averageScore,
       passPercentage,
       candidates,
+      results: candidates,
+      stats: {
+        totalCandidates,
+        passedCount,
+        failedCount,
+        avgMarks: averageScore,
+        passRate: passPercentage,
+      },
     };
   }
 

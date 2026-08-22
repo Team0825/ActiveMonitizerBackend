@@ -230,7 +230,22 @@ export class AdminUsersService {
    * =========================================================
    */
   async deleteUser(userId: string, hard = false, callerId?: string) {
-    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        _count: {
+          select: {
+            examAttempts: true,
+            examResults: true,
+            sessionsAsTeacher: true,
+            questionPapers: true,
+            examsCreated: true,
+            attendanceRecords: true,
+            participations: true,
+          },
+        },
+      },
+    });
     if (!existing) throw new NotFoundException('User not found');
 
     if (existing.isSuperAdmin) {
@@ -238,6 +253,10 @@ export class AdminUsersService {
     }
 
     if (callerId) {
+      if (existing.id === callerId) {
+        throw new ForbiddenException('You cannot delete or deactivate your own currently logged-in account.');
+      }
+
       const caller = await this.prisma.user.findUnique({ where: { id: callerId } });
       if (
         existing.role === 'ADMIN' &&
@@ -248,7 +267,28 @@ export class AdminUsersService {
       }
     }
 
-    if (hard) {
+    // Release any active CBT PC allocations for this student
+    await this.prisma.cbtPcRegistration.updateMany({
+      where: { assignedStudentId: userId },
+      data: {
+        assignedStudentId: null,
+        assignedStudentName: null,
+        assignedStudentRegNo: null,
+        status: 'AVAILABLE',
+      },
+    });
+
+    const hasHistory =
+      existing._count.examAttempts > 0 ||
+      existing._count.examResults > 0 ||
+      existing._count.sessionsAsTeacher > 0 ||
+      existing._count.questionPapers > 0 ||
+      existing._count.examsCreated > 0 ||
+      existing._count.attendanceRecords > 0 ||
+      existing._count.participations > 0;
+
+    // If hard delete requested but historical records exist, safely deactivate to preserve exam history
+    if (hard && !hasHistory) {
       return this.prisma.user.delete({ where: { id: userId } });
     }
 

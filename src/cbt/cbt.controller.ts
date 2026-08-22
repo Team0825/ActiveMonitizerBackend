@@ -149,7 +149,7 @@ export class CbtController {
   }
 
   @UseGuards(RolesGuard)
-  @Post('allocate-student')
+  @Post(['allocate-student', 'pc/allocate', 'pcs/allocate', 'allocate'])
   @Roles('ADMIN', 'TEACHER')
   allocateStudent(
     @Req() req: AuthenticatedRequest,
@@ -169,7 +169,7 @@ export class CbtController {
   }
 
   @UseGuards(RolesGuard)
-  @Post('deallocate-student')
+  @Post(['deallocate-student', 'pc/deallocate', 'pcs/deallocate', 'deallocate'])
   @Roles('ADMIN', 'TEACHER')
   deallocateStudent(
     @Req() req: AuthenticatedRequest,

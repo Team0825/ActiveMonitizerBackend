@@ -176,13 +176,31 @@ let AdminUsersService = class AdminUsersService {
         });
     }
     async deleteUser(userId, hard = false, callerId) {
-        const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+        const existing = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                _count: {
+                    select: {
+                        examAttempts: true,
+                        examResults: true,
+                        sessionsAsTeacher: true,
+                        questionPapers: true,
+                        examsCreated: true,
+                        attendanceRecords: true,
+                        participations: true,
+                    },
+                },
+            },
+        });
         if (!existing)
             throw new common_1.NotFoundException('User not found');
         if (existing.isSuperAdmin) {
             throw new common_1.ForbiddenException('Super Admin account cannot be deleted or disabled.');
         }
         if (callerId) {
+            if (existing.id === callerId) {
+                throw new common_1.ForbiddenException('You cannot delete or deactivate your own currently logged-in account.');
+            }
             const caller = await this.prisma.user.findUnique({ where: { id: callerId } });
             if (existing.role === 'ADMIN' &&
                 existing.id !== callerId &&
@@ -190,7 +208,23 @@ let AdminUsersService = class AdminUsersService {
                 throw new common_1.ForbiddenException('Administrators cannot delete other Administrators.');
             }
         }
-        if (hard) {
+        await this.prisma.cbtPcRegistration.updateMany({
+            where: { assignedStudentId: userId },
+            data: {
+                assignedStudentId: null,
+                assignedStudentName: null,
+                assignedStudentRegNo: null,
+                status: 'AVAILABLE',
+            },
+        });
+        const hasHistory = existing._count.examAttempts > 0 ||
+            existing._count.examResults > 0 ||
+            existing._count.sessionsAsTeacher > 0 ||
+            existing._count.questionPapers > 0 ||
+            existing._count.examsCreated > 0 ||
+            existing._count.attendanceRecords > 0 ||
+            existing._count.participations > 0;
+        if (hard && !hasHistory) {
             return this.prisma.user.delete({ where: { id: userId } });
         }
         return this.prisma.user.update({

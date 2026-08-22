@@ -395,9 +395,13 @@ export class ValidateUniqueCodeDto {
 }
 
 export class AllocateStudentDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  pcHostname: string;
+  pcHostname?: string;
+
+  @IsOptional()
+  @IsString()
+  pcId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -410,6 +414,14 @@ export class AllocateStudentDto {
   @IsOptional()
   @IsString()
   examId?: string;
+
+  @IsOptional()
+  @IsString()
+  examinationId?: string;
+
+  @IsOptional()
+  @IsString()
+  questionPaperId?: string;
 
   @IsOptional()
   @IsString()
